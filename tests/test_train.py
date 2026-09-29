@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import joblib
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.linear_model import LogisticRegression
 
 from noshow_guard.config import SearchConfig
 from noshow_guard.explain import top_factors
 from noshow_guard.features import FEATURE_COLUMNS
-from noshow_guard.model import fit_calibrator
+from noshow_guard.model import fit_calibrator, load_model
 from noshow_guard.train import TrainResult, _json_safe, fit_all, rule_lead_threshold
 
 SMOKE = SearchConfig(n_iter=2, max_estimators=60, early_stopping_rounds=10, calibration_folds=3)
@@ -31,7 +33,7 @@ def test_smoke_training_produces_valid_probabilities(
     assert np.all((p >= 0) & (p <= 1))
     # Con señal sintética clara, el modelo debe superar a la clase mayoritaria.
     test = result.metrics["test"]
-    assert test["lightgbm_calibrado"]["pr_auc"] > test["clase_mayoritaria"]["pr_auc"]
+    assert test["regresion_logistica_calibrada"]["pr_auc"] > test["clase_mayoritaria"]["pr_auc"]
 
 
 def test_metrics_contain_required_sections(result: TrainResult) -> None:
@@ -41,14 +43,38 @@ def test_metrics_contain_required_sections(result: TrainResult) -> None:
     assert set(result.metrics["segments_test"]["historial"][0]) >= {"group", "recall", "fpr"}
 
 
-def test_model_roundtrip_gives_identical_predictions(
+def test_principal_model_is_calibrated_logistic_regression(result: TrainResult) -> None:
+    assert isinstance(result.model.pipeline.named_steps["clf"], LogisticRegression)
+    assert result.metrics["principal_model"] == "regresion_logistica_calibrada"
+    assert result.metrics["model_decision"]["decidido_despues_de_ver_test"] is True
+    # LightGBM sigue en la tabla como comparación.
+    assert "lightgbm_calibrado" in result.metrics["test"]
+
+
+def test_rolling_origin_comparison_does_not_use_test(result: TrainResult) -> None:
+    rows = result.metrics["rolling_origin_pr_auc"]
+    assert len(rows) == 3
+    assert all(row["evalua_hasta"] <= "2016-05-31" for row in rows)
+    assert all({"regresion_logistica", "lightgbm"} <= set(row) for row in rows)
+
+
+def test_load_model_uses_metadata_file(
     result: TrainResult, synthetic_splits: dict[str, pd.DataFrame], tmp_path: Path
 ) -> None:
-    path = tmp_path / "model.joblib"
-    joblib.dump(result.model, path)
-    loaded = joblib.load(path)
+    joblib.dump(result.model, tmp_path / "v1.joblib")
+    meta_path = tmp_path / "metadata.json"
+    meta_path.write_text(json.dumps({"model_file": "v1.joblib", "thresholds": {}}), "utf-8")
+    loaded, meta = load_model(meta_path)
     test = synthetic_splits["test"]
     np.testing.assert_array_equal(loaded.predict_proba(test), result.model.predict_proba(test))
+    assert meta["model_file"] == "v1.joblib"
+
+
+def test_load_model_rejects_wrong_artifact(tmp_path: Path) -> None:
+    joblib.dump({"not": "a model"}, tmp_path / "bad.joblib")
+    (tmp_path / "metadata.json").write_text(json.dumps({"model_file": "bad.joblib"}), "utf-8")
+    with pytest.raises(TypeError, match="NoShowModel"):
+        load_model(tmp_path / "metadata.json")
 
 
 def test_shap_contributions_are_additive(
@@ -59,6 +85,16 @@ def test_shap_contributions_are_additive(
     assert list(contrib.columns) == [*FEATURE_COLUMNS, "base_value"]
     raw = result.model.raw_proba(rows)
     np.testing.assert_allclose(contrib.sum(axis=1), np.log(raw / (1 - raw)), atol=1e-6)
+
+
+def test_changing_one_feature_changes_only_its_contribution(
+    result: TrainResult, synthetic_splits: dict[str, pd.DataFrame]
+) -> None:
+    row = synthetic_splits["test"].iloc[[0]].copy()
+    other = row.assign(age=95 if row["age"].iloc[0] < 50 else 5)
+    diff = result.model.contributions(other) - result.model.contributions(row)
+    changed = diff.columns[diff.iloc[0].abs() > 1e-12].tolist()
+    assert changed == ["age"]
 
 
 def test_top_factors_sorted_by_magnitude(
