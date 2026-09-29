@@ -1,0 +1,64 @@
+{
+  "model_version": "20260929_c823f970",
+  "model_file": "20260929_c823f970.joblib",
+  "created_at": "2026-09-29T18:41:07+00:00",
+  "data_hash": "c823f97010622bc4fbb6fbfb96b385291ee4b01bd2b58cf395f586315aa4f6d3",
+  "raw_sha256": "9132d3e7d0246617df9041d3764f20ad6f08e7b0d9f0997fa254fc5e52eda27d",
+  "seed": 42,
+  "features": [
+    "lead_time_days",
+    "appointment_weekday",
+    "age",
+    "is_male",
+    "scholarship",
+    "hypertension",
+    "diabetes",
+    "alcoholism",
+    "handicap",
+    "neighbourhood",
+    "has_history",
+    "prev_appointments",
+    "prev_no_shows",
+    "prev_no_show_rate"
+  ],
+  "calibration_method": "platt",
+  "thresholds": {
+    "standard": 0.33,
+    "reinforced": 0.67
+  },
+  "costs": {
+    "no_show_cost": 20.0,
+    "standard_cost": 1.0,
+    "reinforced_cost": 3.0,
+    "standard_effect": 0.15,
+    "reinforced_effect": 0.3
+  },
+  "best_params": {
+    "learning_rate": 0.1,
+    "num_leaves": 15.0,
+    "min_child_samples": 20.0,
+    "subsample": 0.85,
+    "colsample_bytree": 1.0,
+    "reg_lambda": 0.0,
+    "best_iteration": 216.0
+  },
+  "train_ranges": {
+    "lead_time_days_max": 176,
+    "age_min": 0,
+    "age_max": 98
+  },
+  "test_metrics": {
+    "pr_auc": 0.3209,
+    "prevalence": 0.26,
+    "roc_auc": 0.5888,
+    "brier": 0.1891,
+    "log_loss": 0.5643
+  },
+  "libraries": {
+    "scikit-learn": "1.7.2",
+    "lightgbm": "4.6.0",
+    "pandas": "2.3.2",
+    "numpy": "2.3.3",
+    "shap": "0.48.0"
+  }
+}
