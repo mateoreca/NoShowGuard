@@ -41,7 +41,8 @@ def parity() -> pd.DataFrame:
                 appointment_date=row["appointment_date"].date(),
                 appointment_time=time(10, 0),
                 as_of=row["as_of"].date(),
-            )
+            ),
+            log=False,  # un test nunca escribe en el registro real
         )
         assert result.features is not None
         diff = [k for k in FEATURE_COLUMNS if result.features[k] != row[k]]

@@ -8,14 +8,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from noshow_guard.config import SearchConfig
-from noshow_guard.data import CLEAN_DTYPES
 from noshow_guard.features import FEATURE_COLUMNS, META_COLUMNS, build_feature_frame, temporal_split
 from noshow_guard.simulator import Simulator
+from noshow_guard.smoke import SMOKE_SEARCH
+from noshow_guard.synthetic import NEIGHBOURHOODS, synthetic_clean
 from noshow_guard.train import build_metadata, fit_all
-
-NEIGHBOURHOODS = ["CENTRO", "JARDIM", "PRAIA", "MORRO", "ILHA"]
-SMOKE = SearchConfig(n_iter=2, max_estimators=60, early_stopping_rounds=10, calibration_folds=3)
 
 
 def _sigmoid(x: np.ndarray | float) -> np.ndarray | float:
@@ -47,7 +44,7 @@ def synthetic_split(n: int, start: str, days: int, seed: int) -> pd.DataFrame:
             "diabetes": rng.binomial(1, 0.07, n),
             "alcoholism": rng.binomial(1, 0.03, n),
             "handicap": rng.binomial(1, 0.02, n),
-            "neighbourhood": rng.choice(NEIGHBOURHOODS, n),
+            "neighbourhood": rng.choice(list(NEIGHBOURHOODS), n),
             "has_history": (prev > 0).astype(int),
             "prev_appointments": prev,
             "prev_no_shows": prev_ns,
@@ -66,45 +63,6 @@ def synthetic_splits() -> dict[str, pd.DataFrame]:
     }
 
 
-def synthetic_clean(n_patients: int = 1200, seed: int = 7) -> pd.DataFrame:
-    """Dataset limpio sintético (esquema de ``data.clean``) con pacientes que repiten citas."""
-    rng = np.random.default_rng(seed)
-    gap = pd.date_range("2016-05-21", "2016-05-23")  # entre train y validación
-    days = pd.date_range("2016-04-29", "2016-06-08").difference(gap)
-    rows = []
-    for pid in range(n_patients):
-        patient = {
-            "patient_id": str(10_000 + pid),
-            "gender": rng.choice(["F", "M"]),
-            "age": int(rng.integers(0, 95)),
-            "neighbourhood": rng.choice(NEIGHBOURHOODS),
-            **{c: int(rng.binomial(1, 0.15)) for c in ("scholarship", "hypertension")},
-            **{c: int(rng.binomial(1, 0.05)) for c in ("diabetes", "alcoholism", "sms_received")},
-            "handicap": int(rng.binomial(1, 0.02)),
-        }
-        for _ in range(int(rng.integers(1, 6))):
-            appointment = rng.choice(days)
-            lead = int(rng.integers(0, 40))
-            scheduled_at = (
-                appointment
-                - pd.Timedelta(days=lead)
-                + pd.Timedelta(hours=int(rng.integers(7, 18)), minutes=int(rng.integers(0, 60)))
-            )
-            p = _sigmoid(-1.3 + 0.03 * lead - 0.01 * (patient["age"] - 40))
-            rows.append(
-                {
-                    **patient,
-                    "scheduled_at": scheduled_at,
-                    "scheduled_date": scheduled_at.normalize(),
-                    "appointment_date": appointment,
-                    "no_show": int(rng.binomial(1, p)),
-                }
-            )
-    frame = pd.DataFrame(rows)
-    frame["appointment_id"] = np.arange(len(frame)) + 5_000_000
-    return frame[list(CLEAN_DTYPES)].astype(CLEAN_DTYPES)
-
-
 @dataclass
 class SyntheticWorld:
     """Simulador entrenado con datos sintéticos + los datos que lo generaron."""
@@ -118,6 +76,6 @@ class SyntheticWorld:
 def world() -> SyntheticWorld:
     clean = synthetic_clean()
     splits = temporal_split(build_feature_frame(clean, clean))
-    result = fit_all(splits, search=SMOKE)
+    result = fit_all(splits, search=SMOKE_SEARCH)
     metadata = build_metadata(result.metrics, "sintetico", "0" * 64, "2026-01-01T00:00:00+00:00")
     return SyntheticWorld(Simulator.build(result.model, metadata, clean), clean, splits)

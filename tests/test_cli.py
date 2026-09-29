@@ -12,6 +12,8 @@ from noshow_guard import cli, simulator
 
 @pytest.fixture(autouse=True)
 def synthetic_default(world: SyntheticWorld, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Simulador sintético sin registro: la CLI nunca toca data/simulations.db en los tests.
+    assert world.simulator.registry is None
     monkeypatch.setattr(simulator, "_DEFAULT", world.simulator)
 
 
