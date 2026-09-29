@@ -19,4 +19,11 @@ make lint    # ruff + mypy
 
 ## Datos
 
-El CSV crudo va en `data/raw/data.csv` y no se versiona. Fuente, licencia y reglas de limpieza se documentan en la Fase 1.
+Dataset público [Medical Appointment No Shows](https://www.kaggle.com/datasets/joniarroba/noshowappointments) (Kaggle, CC BY-NC-SA 4.0). El CSV va en `data/raw/data.csv` y no se versiona.
+
+```bash
+make data   # verifica hash, limpia y valida -> data/processed/appointments_clean.parquet
+make eda    # ejecuta notebooks/01_eda.ipynb
+```
+
+Reglas de limpieza, fuente y limitaciones: [docs/data_quality.md](docs/data_quality.md).
