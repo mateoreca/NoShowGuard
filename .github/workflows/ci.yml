@@ -28,3 +28,6 @@ jobs:
 
       - name: Tests
         run: make test
+
+      - name: Entrenamiento de humo (datos sintéticos, sin Kaggle)
+        run: make smoke
