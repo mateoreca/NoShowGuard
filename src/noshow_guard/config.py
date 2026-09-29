@@ -24,6 +24,10 @@ class Paths:
     cleaning_report: Path = field(default=PROJECT_ROOT / "reports" / "data_cleaning.json")
     features_dir: Path = field(default=PROJECT_ROOT / "data" / "processed" / "features")
     split_summary: Path = field(default=PROJECT_ROOT / "reports" / "split_summary.json")
+    figures: Path = field(default=PROJECT_ROOT / "reports" / "figures")
+    metrics: Path = field(default=PROJECT_ROOT / "reports" / "metrics.json")
+    models: Path = field(default=PROJECT_ROOT / "models")
+    model_metadata: Path = field(default=PROJECT_ROOT / "models" / "metadata.json")
 
 
 @dataclass(frozen=True)
@@ -46,10 +50,38 @@ class SplitConfig:
     test_start: date = date(2016, 6, 1)
 
 
+@dataclass(frozen=True)
+class CostConfig:
+    """Supuestos de costo y efecto de las acciones (NO salen de los datos).
+
+    Unidades relativas: 1 = costo de un recordatorio estándar por WhatsApp.
+    Una acción conviene frente a no hacer nada si ``no_show_cost * p * effect > costo``,
+    es decir, si ``p > costo / (no_show_cost * effect)``.
+    """
+
+    no_show_cost: float = 20.0  # hueco vacío en la agenda
+    standard_cost: float = 1.0  # recordatorio estándar
+    reinforced_cost: float = 3.0  # recordatorio + solicitud de confirmación (incluye seguimiento)
+    standard_effect: float = 0.15  # reducción relativa supuesta del no-show
+    reinforced_effect: float = 0.30
+
+
+@dataclass(frozen=True)
+class SearchConfig:
+    """Búsqueda aleatoria de hiperparámetros de LightGBM."""
+
+    n_iter: int = 30
+    max_estimators: int = 2000
+    early_stopping_rounds: int = 100
+    calibration_folds: int = 5
+
+
 SEED: int = 42
 PATHS = Paths()
 DATA_RULES = DataRules()
 SPLIT = SplitConfig()
+COSTS = CostConfig()
+SEARCH = SearchConfig()
 
 # Citas con antelación menor a esto quedan fuera del alcance del modelo (mismo día).
 MIN_LEAD_DAYS: int = 1

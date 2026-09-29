@@ -20,9 +20,8 @@ dist/
 htmlcov/
 .ipynb_checkpoints/
 
-# Artefactos de ML
-mlruns/
-mlartifacts/
+# Artefactos de ML (el modelo se regenera con `make train`)
+models/*.joblib
 *.db
 
 # Secretos
