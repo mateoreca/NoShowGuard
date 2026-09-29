@@ -5,7 +5,7 @@
     "principal": "regresion_logistica_calibrada",
     "comparacion": "lightgbm_calibrado",
     "decidido_despues_de_ver_test": true,
-    "motivo": "La regresión logística y LightGBM empatan en PR-AUC de validación (diferencia < 0,0001) y en los 3 cortes temporales con origen móvil (train + validación, sin test) no hay ganador consistente: diferencias de +0,007, -0,001 y 0,000 para LightGBM. Ante un empate se prefiere el modelo más simple y explicable. La decisión se tomó después de ver test, donde LightGBM quedó por debajo; no se hizo otra selección de LightGBM contra test.",
+    "motivo": "La regresión logística y LightGBM empatan en PR-AUC de validación (diferencia < 0,0001) y en los 3 cortes temporales con origen móvil (train + validación, sin test) no hay ganador consistente: diferencias de +0,007, -0,001 y 0,000 para LightGBM (cifras al momento de decidir, con conteos de historial lineales; ver ADR 0002). Ante un empate se prefiere el modelo más simple y explicable. La decisión se tomó después de ver test, donde LightGBM quedó por debajo; no se hizo otra selección de LightGBM contra test.",
     "adr": "docs/adr/0001-modelo-principal.md"
   },
   "rows": {
@@ -35,18 +35,18 @@
       "flagged_rate": 0.925795664206642
     },
     "regresion_logistica_sin_calibrar": {
-      "pr_auc": 0.3337263281472374,
+      "pr_auc": 0.3325434828525905,
       "prevalence": 0.25997463099630996,
-      "roc_auc": 0.6025621094736467,
-      "brier": 0.18899225584939877,
-      "log_loss": 0.563808442280665
+      "roc_auc": 0.6019674800077376,
+      "brier": 0.18899855412047112,
+      "log_loss": 0.5637181934488462
     },
     "regresion_logistica_calibrada": {
-      "pr_auc": 0.3337263281472374,
+      "pr_auc": 0.3325434828525905,
       "prevalence": 0.25997463099630996,
-      "roc_auc": 0.6025621094736467,
-      "brier": 0.18777815576943507,
-      "log_loss": 0.5610432139820842
+      "roc_auc": 0.6019674800077376,
+      "brier": 0.18782363590410406,
+      "log_loss": 0.5610809967400684
     },
     "lightgbm_sin_calibrar": {
       "pr_auc": 0.3208747600808575,
@@ -64,7 +64,7 @@
     }
   },
   "val_pr_auc": {
-    "regresion_logistica_sin_calibrar": 0.3522013733584731,
+    "regresion_logistica_sin_calibrar": 0.35029726364666885,
     "lightgbm_sin_calibrar": 0.3521698324209809
   },
   "rolling_origin_pr_auc": [
@@ -72,21 +72,21 @@
       "train_hasta": "2016-05-06",
       "evalua_hasta": "2016-05-13",
       "n_eval": 14006,
-      "regresion_logistica": 0.37598112423586333,
+      "regresion_logistica": 0.37601581143210255,
       "lightgbm": 0.38304045118510965
     },
     {
       "train_hasta": "2016-05-13",
       "evalua_hasta": "2016-05-20",
       "n_eval": 14211,
-      "regresion_logistica": 0.385941201809302,
+      "regresion_logistica": 0.3863562676418504,
       "lightgbm": 0.38519509136805813
     },
     {
       "train_hasta": "2016-05-20",
       "evalua_hasta": "2016-05-31",
       "n_eval": 10671,
-      "regresion_logistica": 0.3522013733584731,
+      "regresion_logistica": 0.35029726364666885,
       "lightgbm": 0.3521698324209809
     }
   ],
@@ -107,9 +107,9 @@
   "calibration": {
     "method": "platt",
     "cv_brier_val": {
-      "raw": 0.19837349585511774,
-      "isotonic": 0.19745105588526196,
-      "platt": 0.19720857092947894
+      "raw": 0.19841529426284582,
+      "isotonic": 0.19752860886514506,
+      "platt": 0.19726824293238204
     },
     "lightgbm": {
       "method": "platt",
@@ -128,7 +128,7 @@
     "reinforced_effect": 0.3
   },
   "thresholds": {
-    "standard": 0.35,
+    "standard": 0.36,
     "reinforced": 0.67
   },
   "analytic_thresholds": {
@@ -137,33 +137,38 @@
   },
   "policy_cost_per_appointment": {
     "val": {
-      "politica_modelo": 5.576328366601068,
+      "politica_modelo": 5.57623465467154,
       "no_hacer_nada": 5.602099147221441,
       "estandar_a_todos": 5.761784275138225,
       "reforzado_a_todos": 6.921469403055009
     },
     "test": {
-      "politica_modelo": 5.183925276752768,
+      "politica_modelo": 5.189345018450185,
       "no_hacer_nada": 5.1994926199261995,
       "estandar_a_todos": 5.419568726937269,
       "reforzado_a_todos": 6.639644833948339
     }
   },
+  "risk_cutoffs": {
+    "medio": 0.28015495917809075,
+    "alto": 0.36622671092355485
+  },
+  "history_counts_transform": "log1p (ADR 0002)",
   "action_counts_test": {
-    "sin_accion": 15490,
-    "recordatorio_estandar": 1854,
+    "sin_accion": 15924,
+    "recordatorio_estandar": 1420,
     "recordatorio_reforzado_con_confirmacion": 0
   },
   "max_probability": {
-    "val": 0.5073011257773465,
-    "test": 0.6058248579559702
+    "val": 0.5136608276329742,
+    "test": 0.5272065679066181
   },
   "decision_metrics_test": {
     "any_reminder": {
-      "precision": 0.3818770226537217,
-      "recall": 0.15701929474384566,
-      "fpr": 0.0892871055707051,
-      "flagged_rate": 0.10689575645756458
+      "precision": 0.37464788732394366,
+      "recall": 0.11798624972277667,
+      "fpr": 0.06918582002337359,
+      "flagged_rate": 0.08187269372693727
     },
     "reinforced": {
       "precision": null,
@@ -178,27 +183,27 @@
         "group": "con historial",
         "n": 7196,
         "prevalence": 0.2459699833240689,
-        "mean_p": 0.24941984241107956,
-        "pr_auc": 0.33261148259408946,
-        "roc_auc": 0.6154729477864478,
-        "brier": 0.17995008241454075,
-        "precision": 0.39158576051779936,
-        "recall": 0.1367231638418079,
-        "fpr": 0.06929598230740877,
-        "flagged_rate": 0.0858810450250139
+        "mean_p": 0.24891827835422672,
+        "pr_auc": 0.3299183137495283,
+        "roc_auc": 0.6147616831285233,
+        "brier": 0.1800591115790521,
+        "precision": 0.37684210526315787,
+        "recall": 0.10112994350282486,
+        "fpr": 0.05455215628455584,
+        "flagged_rate": 0.0660088938299055
       },
       {
         "group": "sin historial",
         "n": 10148,
         "prevalence": 0.2699054000788333,
-        "mean_p": 0.2793449310295785,
-        "pr_auc": 0.3345518752158425,
-        "roc_auc": 0.5904535207296259,
-        "brier": 0.19332908362337864,
-        "precision": 0.37702265372168287,
-        "recall": 0.1701350857977364,
-        "fpr": 0.10392765555405588,
-        "flagged_rate": 0.12179739850216792
+        "mean_p": 0.2797621111933022,
+        "pr_auc": 0.33462773100760895,
+        "roc_auc": 0.5904983139468388,
+        "brier": 0.19332950080783617,
+        "precision": 0.37354497354497357,
+        "recall": 0.1288791529755385,
+        "fpr": 0.07990282089350789,
+        "flagged_rate": 0.09312179739850217
       }
     ],
     "paciente_en_train": [
@@ -206,27 +211,27 @@
         "group": "no",
         "n": 10055,
         "prevalence": 0.2574838388861263,
-        "mean_p": 0.2676712296052546,
-        "pr_auc": 0.32582862257367967,
-        "roc_auc": 0.5940944125018611,
-        "brier": 0.18735758559328614,
-        "precision": 0.3810032017075774,
-        "recall": 0.13789107763615296,
-        "fpr": 0.07768550763461023,
-        "flagged_rate": 0.09318746892093485
+        "mean_p": 0.2679833637677231,
+        "pr_auc": 0.3257945875019269,
+        "roc_auc": 0.5939562297453101,
+        "brier": 0.1873718262476321,
+        "precision": 0.37252124645892354,
+        "recall": 0.10158362302047122,
+        "fpr": 0.05933565496919368,
+        "flagged_rate": 0.07021382396817503
       },
       {
         "group": "si",
         "n": 7289,
         "prevalence": 0.263410618740568,
-        "mean_p": 0.265905245218474,
-        "pr_auc": 0.3444150004352092,
-        "roc_auc": 0.6131341866114112,
-        "brier": 0.18835832220120588,
-        "precision": 0.38276990185387133,
-        "recall": 0.1828125,
-        "fpr": 0.10542000372508847,
-        "flagged_rate": 0.12580600905474001
+        "mean_p": 0.26556031180438894,
+        "pr_auc": 0.34201513034059783,
+        "roc_auc": 0.6122563656329546,
+        "brier": 0.18844689644681573,
+        "precision": 0.37675070028011204,
+        "recall": 0.14010416666666667,
+        "fpr": 0.08288321847643881,
+        "flagged_rate": 0.09795582384414872
       }
     ],
     "edad": [
@@ -234,62 +239,62 @@
         "group": "0-17",
         "n": 3840,
         "prevalence": 0.29401041666666666,
-        "mean_p": 0.30229344719554946,
-        "pr_auc": 0.32986268580292266,
-        "roc_auc": 0.5457791126856141,
-        "brier": 0.20665341093961942,
-        "precision": 0.347068145800317,
-        "recall": 0.19397697077059345,
-        "fpr": 0.1519734415344891,
-        "flagged_rate": 0.16432291666666668
+        "mean_p": 0.30197605503629166,
+        "pr_auc": 0.32906174202184624,
+        "roc_auc": 0.545466114334573,
+        "brier": 0.20670965694326585,
+        "precision": 0.3550420168067227,
+        "recall": 0.14968999114260406,
+        "fpr": 0.11324234599778679,
+        "flagged_rate": 0.12395833333333334
       },
       {
         "group": "18-35",
         "n": 3808,
         "prevalence": 0.3224789915966387,
-        "mean_p": 0.31081234954111764,
-        "pr_auc": 0.37737804540975206,
-        "roc_auc": 0.579614075953842,
-        "brier": 0.21519229921061342,
-        "precision": 0.3982202447163515,
-        "recall": 0.2915309446254072,
-        "fpr": 0.20968992248062016,
-        "flagged_rate": 0.23608193277310924
+        "mean_p": 0.31063406160792323,
+        "pr_auc": 0.3772189550366467,
+        "roc_auc": 0.578552603338131,
+        "brier": 0.2151722224215466,
+        "precision": 0.38549075391180654,
+        "recall": 0.22068403908794787,
+        "fpr": 0.16744186046511628,
+        "flagged_rate": 0.18461134453781514
       },
       {
         "group": "36-55",
         "n": 4842,
         "prevalence": 0.25154894671623296,
-        "mean_p": 0.2630877953758884,
-        "pr_auc": 0.3182810225787871,
-        "roc_auc": 0.5804221627754398,
-        "brier": 0.1854522332946603,
-        "precision": 0.3974358974358974,
-        "recall": 0.10180623973727422,
-        "fpr": 0.05187637969094923,
-        "flagged_rate": 0.0644361833952912
+        "mean_p": 0.26330428170900794,
+        "pr_auc": 0.31750076126552873,
+        "roc_auc": 0.5797977903195989,
+        "brier": 0.1853969755017914,
+        "precision": 0.3829787234042553,
+        "recall": 0.07389162561576355,
+        "fpr": 0.04001103752759382,
+        "flagged_rate": 0.04853366377529946
       },
       {
         "group": "56-75",
         "n": 3911,
         "prevalence": 0.18844285349015596,
-        "mean_p": 0.20936486563956588,
-        "pr_auc": 0.25433707056400934,
-        "roc_auc": 0.578619191377705,
-        "brier": 0.1511688397136116,
-        "precision": 0.5833333333333334,
-        "recall": 0.009497964721845319,
-        "fpr": 0.001575299306868305,
-        "flagged_rate": 0.003068268984914344
+        "mean_p": 0.2097565470343661,
+        "pr_auc": 0.24809478279435385,
+        "roc_auc": 0.5754831274115759,
+        "brier": 0.151416319593519,
+        "precision": 0.3333333333333333,
+        "recall": 0.0027137042062415195,
+        "fpr": 0.001260239445494644,
+        "flagged_rate": 0.001534134492457172
       },
       {
         "group": "76+",
         "n": 943,
         "prevalence": 0.20890774125132555,
-        "mean_p": 0.20417835320086183,
-        "pr_auc": 0.24801434538336928,
-        "roc_auc": 0.5657721043535063,
-        "brier": 0.16398930491012392,
+        "mean_p": 0.20411674443042668,
+        "pr_auc": 0.24974303961434174,
+        "roc_auc": 0.5685347232617955,
+        "brier": 0.16393515818394855,
         "precision": null,
         "recall": 0.0,
         "fpr": 0.0,
@@ -301,66 +306,66 @@
         "group": "1-2",
         "n": 3369,
         "prevalence": 0.22291481151677056,
-        "mean_p": 0.21399793327440872,
-        "pr_auc": 0.28761348850314816,
-        "roc_auc": 0.5899236464952765,
-        "brier": 0.17025939864755102,
-        "precision": 0.4166666666666667,
-        "recall": 0.013315579227696404,
-        "fpr": 0.0053475935828877,
-        "flagged_rate": 0.007123775601068566
+        "mean_p": 0.21397285280054615,
+        "pr_auc": 0.2855998268129286,
+        "roc_auc": 0.587959369681779,
+        "brier": 0.17043362383682933,
+        "precision": 0.4444444444444444,
+        "recall": 0.005326231691078562,
+        "fpr": 0.0019098548510313217,
+        "flagged_rate": 0.0026714158504007124
       },
       {
         "group": "15-30",
         "n": 4766,
         "prevalence": 0.2811582039446076,
-        "mean_p": 0.3040318298263854,
-        "pr_auc": 0.3418761157297794,
-        "roc_auc": 0.5958120953899504,
-        "brier": 0.19833445903384256,
-        "precision": 0.36140018921475875,
-        "recall": 0.28507462686567164,
-        "fpr": 0.19702276707530647,
-        "flagged_rate": 0.22177926982794796
+        "mean_p": 0.3040545331419917,
+        "pr_auc": 0.3421520933348837,
+        "roc_auc": 0.5961839227679466,
+        "brier": 0.19826446294666725,
+        "precision": 0.3503562945368171,
+        "recall": 0.22014925373134328,
+        "fpr": 0.15966141272621132,
+        "flagged_rate": 0.17666806546370123
       },
       {
         "group": "3-7",
         "n": 4153,
         "prevalence": 0.2241752949674934,
-        "mean_p": 0.2365627084630535,
-        "pr_auc": 0.3151670881235376,
-        "roc_auc": 0.5990354977627629,
-        "brier": 0.1700636287743329,
-        "precision": 0.569620253164557,
-        "recall": 0.04833512352309345,
-        "fpr": 0.010552451893234015,
-        "flagged_rate": 0.019022393450517698
+        "mean_p": 0.23668073382417998,
+        "pr_auc": 0.3127826799653606,
+        "roc_auc": 0.5997795766351233,
+        "brier": 0.17007863818366858,
+        "precision": 0.5897435897435898,
+        "recall": 0.024704618689581095,
+        "fpr": 0.004965859714463066,
+        "flagged_rate": 0.009390801830002408
       },
       {
         "group": "31+",
         "n": 2548,
         "prevalence": 0.3178963893249607,
-        "mean_p": 0.30611701560418847,
-        "pr_auc": 0.3968308230608179,
-        "roc_auc": 0.5786042563468724,
-        "brier": 0.21313565453655908,
-        "precision": 0.41125541125541126,
-        "recall": 0.2345679012345679,
-        "fpr": 0.1565017261219793,
-        "flagged_rate": 0.1813186813186813
+        "mean_p": 0.3065731761948199,
+        "pr_auc": 0.397031979287512,
+        "roc_auc": 0.5784721334299394,
+        "brier": 0.2131255267000658,
+        "precision": 0.43380281690140843,
+        "recall": 0.19012345679012346,
+        "fpr": 0.11565017261219793,
+        "flagged_rate": 0.13932496075353218
       },
       {
         "group": "8-14",
         "n": 2508,
         "prevalence": 0.2699362041467305,
-        "mean_p": 0.2779951052303519,
-        "pr_auc": 0.32203198443079706,
-        "roc_auc": 0.5698462471774873,
-        "brier": 0.19482236435695044,
-        "precision": 0.34913793103448276,
-        "recall": 0.11964549483013294,
-        "fpr": 0.08246859639541235,
-        "flagged_rate": 0.09250398724082935
+        "mean_p": 0.27757569731684734,
+        "pr_auc": 0.31662169016390074,
+        "roc_auc": 0.5672453809212262,
+        "brier": 0.19502129409973806,
+        "precision": 0.32,
+        "recall": 0.0827178729689808,
+        "fpr": 0.06499180775532495,
+        "flagged_rate": 0.06977671451355662
       }
     ],
     "genero": [
@@ -368,27 +373,27 @@
         "group": "F",
         "n": 11604,
         "prevalence": 0.25698035160289556,
-        "mean_p": 0.26611934551158456,
-        "pr_auc": 0.3355188220429681,
-        "roc_auc": 0.6058425671947093,
-        "brier": 0.18608782979760197,
-        "precision": 0.39032006245121,
-        "recall": 0.1676727028839705,
-        "fpr": 0.09058223150081188,
-        "flagged_rate": 0.11039296794208893
+        "mean_p": 0.26612189875736975,
+        "pr_auc": 0.33434305530939334,
+        "roc_auc": 0.6049111299669976,
+        "brier": 0.186174000159338,
+        "precision": 0.38178096212896623,
+        "recall": 0.125083836351442,
+        "fpr": 0.07005335189051264,
+        "flagged_rate": 0.08419510513615995
       },
       {
         "group": "M",
         "n": 5740,
         "prevalence": 0.2660278745644599,
-        "mean_p": 0.268565968773844,
-        "pr_auc": 0.3305005054129054,
-        "roc_auc": 0.5953132405373271,
-        "brier": 0.19119532346580287,
-        "precision": 0.36300174520069806,
-        "recall": 0.13621480026195154,
-        "fpr": 0.08663660099691431,
-        "flagged_rate": 0.09982578397212544
+        "mean_p": 0.2686695683355623,
+        "pr_auc": 0.3295378123153696,
+        "roc_auc": 0.595470237365214,
+        "brier": 0.1911585441240109,
+        "precision": 0.35891647855530473,
+        "recall": 0.10412573673870335,
+        "fpr": 0.06741039639211963,
+        "flagged_rate": 0.07717770034843205
       }
     ],
     "beca": [
@@ -396,27 +401,27 @@
         "group": "no",
         "n": 15807,
         "prevalence": 0.2547605491238059,
-        "mean_p": 0.26172847706221164,
-        "pr_auc": 0.3206206274004299,
-        "roc_auc": 0.596961005572319,
-        "brier": 0.18590621480176442,
-        "precision": 0.36438152011922503,
-        "recall": 0.12143034517010182,
-        "fpr": 0.07241086587436332,
-        "flagged_rate": 0.0848990953375087
+        "mean_p": 0.2617879456356702,
+        "pr_auc": 0.32001207533397746,
+        "roc_auc": 0.5966664952150236,
+        "brier": 0.18591067664980124,
+        "precision": 0.35601577909270216,
+        "recall": 0.08964489694561709,
+        "fpr": 0.05543293718166384,
+        "flagged_rate": 0.06414879483773012
       },
       {
         "group": "si",
         "n": 1537,
         "prevalence": 0.313597918022121,
-        "mean_p": 0.3204134737514065,
-        "pr_auc": 0.41219983209998057,
-        "roc_auc": 0.6312992861497316,
-        "brier": 0.20702979589693654,
-        "precision": 0.427734375,
-        "recall": 0.45435684647302904,
-        "fpr": 0.2777251184834123,
-        "flagged_rate": 0.33311646063760575
+        "mean_p": 0.32020805384750006,
+        "pr_auc": 0.40742583824805667,
+        "roc_auc": 0.626762502212346,
+        "brier": 0.20749712122145197,
+        "precision": 0.4211822660098522,
+        "recall": 0.35477178423236516,
+        "fpr": 0.22274881516587677,
+        "flagged_rate": 0.2641509433962264
       }
     ]
   },
@@ -424,94 +429,94 @@
     "method": "lineal exacto, agregado por feature original (log-odds sin calibrar)",
     "sample_size": 3000,
     "global_mean_abs": {
-      "age": 0.2302,
-      "lead_time_days": 0.1987,
-      "neighbourhood": 0.0983,
+      "age": 0.2291,
+      "lead_time_days": 0.1972,
+      "neighbourhood": 0.0985,
+      "prev_appointments": 0.0887,
       "appointment_weekday": 0.0548,
-      "prev_appointments": 0.0508,
-      "has_history": 0.0479,
-      "prev_no_shows": 0.0427,
-      "scholarship": 0.0334,
-      "prev_no_show_rate": 0.0262,
-      "diabetes": 0.0218,
-      "alcoholism": 0.017,
-      "is_male": 0.0031,
-      "hypertension": 0.0011,
+      "prev_no_shows": 0.0444,
+      "scholarship": 0.0335,
+      "prev_no_show_rate": 0.0245,
+      "diabetes": 0.0216,
+      "alcoholism": 0.0175,
+      "has_history": 0.0125,
+      "hypertension": 0.0022,
+      "is_male": 0.0022,
       "handicap": 0.0008
     },
     "local_examples": [
       {
         "caso": "alta",
-        "probability_no_show": 0.6058,
+        "probability_no_show": 0.5272,
         "no_show_real": 1,
         "top_factors": [
           {
-            "feature": "prev_no_shows",
+            "feature": "alcoholism",
             "effect": "+",
-            "value": 8,
-            "shap": 1.3436
+            "value": 1,
+            "shap": 0.3456
           },
           {
-            "feature": "prev_appointments",
-            "effect": "-",
-            "value": 8,
-            "shap": -0.342
+            "feature": "neighbourhood",
+            "effect": "+",
+            "value": "ITARARÉ",
+            "shap": 0.3266
           },
           {
             "feature": "lead_time_days",
             "effect": "+",
             "value": 19,
-            "shap": 0.2712
+            "shap": 0.2685
           }
         ]
       },
       {
         "caso": "mediana",
-        "probability_no_show": 0.264,
-        "no_show_real": 1,
+        "probability_no_show": 0.2636,
+        "no_show_real": 0,
         "top_factors": [
-          {
-            "feature": "prev_no_show_rate",
-            "effect": "+",
-            "value": 1.0,
-            "shap": 0.2284
-          },
           {
             "feature": "lead_time_days",
             "effect": "-",
-            "value": 2,
-            "shap": -0.1664
+            "value": 1,
+            "shap": -0.3316
           },
           {
-            "feature": "prev_no_shows",
+            "feature": "age",
             "effect": "+",
-            "value": 1,
-            "shap": 0.1611
+            "value": 0,
+            "shap": 0.1548
+          },
+          {
+            "feature": "neighbourhood",
+            "effect": "+",
+            "value": "SÃO BENEDITO",
+            "shap": 0.1415
           }
         ]
       },
       {
         "caso": "baja",
-        "probability_no_show": 0.0328,
-        "no_show_real": 0,
+        "probability_no_show": 0.1101,
+        "no_show_real": 1,
         "top_factors": [
-          {
-            "feature": "prev_appointments",
-            "effect": "-",
-            "value": 56,
-            "shap": -2.4594
-          },
           {
             "feature": "age",
             "effect": "-",
-            "value": 63,
-            "shap": -0.4056
+            "value": 65,
+            "shap": -0.4037
           },
           {
-            "feature": "alcoholism",
-            "effect": "+",
-            "value": 1,
-            "shap": 0.3363
+            "feature": "prev_appointments",
+            "effect": "-",
+            "value": 6,
+            "shap": -0.3259
+          },
+          {
+            "feature": "neighbourhood",
+            "effect": "-",
+            "value": "FRADINHOS",
+            "shap": -0.2572
           }
         ]
       }
