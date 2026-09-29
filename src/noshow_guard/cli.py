@@ -38,11 +38,6 @@ def build_parser() -> argparse.ArgumentParser:
     sim.add_argument(
         "--no-log", action="store_true", help="No guardar la simulación en el registro SQLite."
     )
-    sim.add_argument(
-        "--include-simulated-history",
-        action="store_true",
-        help="Sumar al historial las citas simuladas previas (asumidas como asistidas).",
-    )
 
     new = sim.add_argument_group("paciente nuevo (en lugar de --patient-id)")
     new.add_argument("--age", type=int)
@@ -114,11 +109,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(model_info(), indent=2, ensure_ascii=False))
         return 0
     try:
-        result = simulate(
-            request_from_args(args),
-            log=not args.no_log,
-            include_simulated_history=args.include_simulated_history,
-        )
+        result = simulate(request_from_args(args), log=not args.no_log)
     except ValidationError as exc:
         print(f"Solicitud inválida: {_validation_message(exc)}", file=sys.stderr)
         return 2

@@ -159,24 +159,11 @@ class Simulator:
 
     # --- Simulación ----------------------------------------------------------
 
-    def simulated_history(
-        self, patient_id: str, as_of: date
-    ) -> tuple[list[PastAppointment], list[str]]:
-        """Citas simuladas previas del paciente (opcional), con la advertencia correspondiente."""
-        if self.registry is None:
-            return [], ["No hay registro de simulaciones configurado: se ignora esa opción."]
-        extra = self.registry.simulated_history(patient_id, as_of)
-        if not extra:
-            return [], []
-        return extra, [
-            f"Se incluyeron {len(extra)} cita(s) simulada(s) anteriores a as_of en el historial, "
-            "ASUMIDAS COMO ASISTIDAS (una simulación no tiene resultado real)."
-        ]
+    def evaluate(self, request: SimulationRequest) -> SimulationResult:
+        """Evalúa una cita hipotética sin agendarla ni registrarla.
 
-    def evaluate(
-        self, request: SimulationRequest, include_simulated_history: bool = False
-    ) -> SimulationResult:
-        """Evalúa una cita hipotética sin agendarla ni registrarla."""
+        El historial sale solo del dataset real: las simulaciones registradas nunca entran.
+        """
         lead = lead_time_days(request.appointment_date, request.as_of)
         common = {
             "lead_time_days": lead,
@@ -194,9 +181,6 @@ class Simulator:
             cita, history, warnings = self.existing_patient(
                 request.patient_id, request.as_of, request.appointment_date
             )
-            if include_simulated_history:
-                extra, extra_warnings = self.simulated_history(request.patient_id, request.as_of)
-                history, warnings = history + extra, warnings + extra_warnings
         else:
             assert request.new_patient is not None
             cita, history = self.new_patient(request.new_patient, request.appointment_date), []
@@ -216,14 +200,9 @@ class Simulator:
             **common,
         )
 
-    def simulate(
-        self,
-        request: SimulationRequest,
-        log: bool = True,
-        include_simulated_history: bool = False,
-    ) -> SimulationResult:
+    def simulate(self, request: SimulationRequest, log: bool = True) -> SimulationResult:
         """Evalúa la cita y, si hay registro y ``log`` es True, la guarda como simulada."""
-        result = self.evaluate(request, include_simulated_history)
+        result = self.evaluate(request)
         if log and self.registry is not None:
             self.registry.log(request, result)
         return result
@@ -241,11 +220,7 @@ def get_simulator() -> Simulator:
 
 
 def simulate(
-    request: SimulationRequest,
-    simulator: Simulator | None = None,
-    *,
-    log: bool = True,
-    include_simulated_history: bool = False,
+    request: SimulationRequest, simulator: Simulator | None = None, *, log: bool = True
 ) -> SimulationResult:
     """Punto de entrada: ``simulate(request) -> SimulationResult``. Registra por defecto."""
-    return (simulator or get_simulator()).simulate(request, log, include_simulated_history)
+    return (simulator or get_simulator()).simulate(request, log)

@@ -95,28 +95,26 @@ def test_simulating_does_not_change_real_history(sim: Simulator, world: Syntheti
     assert sim.history[pid] == before_history
 
 
-def test_simulated_history_is_opt_in_and_flagged(sim: Simulator, world: SyntheticWorld) -> None:
+def test_simulations_never_enter_history(sim: Simulator, world: SyntheticWorld) -> None:
     pid = patient(world)
-    # Una cita simulada el 2016-06-02 queda en el registro...
-    sim.simulate(req(new_patient=None, patient_id=pid, appointment_date=date(2016, 6, 2)))
     later = req(
         new_patient=None, patient_id=pid, as_of=date(2016, 6, 5), appointment_date=date(2016, 6, 9)
     )
-    default = sim.simulate(later, log=False)
-    included = sim.simulate(later, log=False, include_simulated_history=True)
-    assert default.features is not None and included.features is not None
-    # ...y solo cuenta si se pide, como cita asistida y con advertencia.
-    assert included.features["prev_appointments"] == default.features["prev_appointments"] + 1
-    assert included.features["prev_no_shows"] == default.features["prev_no_shows"]
-    assert any("ASUMIDAS COMO ASISTIDAS" in w for w in included.warnings)
-    assert not any("simulada" in w for w in default.warnings)
+    before = sim.simulate(later, log=False)
+    # Una cita simulada del paciente, anterior a as_of, queda en el registro...
+    sim.simulate(req(new_patient=None, patient_id=pid, appointment_date=date(2016, 6, 2)))
+    after = sim.simulate(later, log=False)
+    # ...pero no cambia su historial: las features y la probabilidad son idénticas.
+    assert after.features == before.features
+    assert after.probability_no_show == before.probability_no_show
 
 
-def test_simulated_history_query_is_parameterized(sim: Simulator) -> None:
-    sim.simulate(req())
-    assert sim.registry is not None
-    assert sim.registry.simulated_history("1' OR '1'='1", date(2030, 1, 1)) == []
-    assert len(sim.registry.read()) == 1
+def test_cli_has_no_simulated_history_option() -> None:
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(
+            ["simulate", "--age", "30", "--gender", "F", "--neighbourhood", "X",
+             "--date", "2016-06-10", "--time", "10:00", "--include-simulated-history"]
+        )  # fmt: skip
 
 
 def test_read_missing_registry_is_empty(tmp_path: Path) -> None:

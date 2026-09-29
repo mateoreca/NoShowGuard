@@ -256,12 +256,11 @@ Cada `simulate` se guarda en `data/simulations.db` (SQLite, ignorado por git), e
 - Todas las consultas son parametrizadas.
 
 ```bash
-uv run python -m noshow_guard.cli simulate ... --no-log                     # no registra
-uv run python -m noshow_guard.cli simulate ... --include-simulated-history  # opcional, apagado por defecto
-make model-info                                                             # versión, umbrales, costos y métricas del modelo cargado
+uv run python -m noshow_guard.cli simulate ... --no-log   # no registra
+make model-info                                           # versión, umbrales, costos y métricas del modelo cargado
 ```
 
-`--include-simulated-history` suma al historial de un paciente existente sus citas simuladas anteriores a `as_of`. Como una simulación no tiene resultado real, esas citas se **asumen como asistidas**, y la respuesta lo advierte.
+**Las simulaciones nunca entran al historial de un paciente.** El brief pedía una opción `--include-simulated-history`, pero se eliminó por decisión del proyecto: una simulación no tiene resultado real, y para incluirla habría que inventarle uno (por ejemplo, asumir que el paciente asistió). Un test verifica que registrar simulaciones no cambia las features ni la probabilidad de simulaciones posteriores.
 
 **Verificación del criterio**, hecha con la CLI y los datos reales:
 - Tres simulaciones (dos válidas y una del mismo día, fuera de alcance) dejaron 3 filas con `simulated = 1`.
