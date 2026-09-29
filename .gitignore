@@ -1,0 +1,33 @@
+# Datos (sensibles aunque sean públicos; nunca se versionan)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Herramientas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Artefactos de ML
+mlruns/
+mlartifacts/
+*.db
+
+# Secretos
+.env
+
+# IDE
+.vscode/
+.idea/

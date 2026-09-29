@@ -1,0 +1,1 @@
+"""Feature engineering (funciones puras)."""
