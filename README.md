@@ -2,7 +2,7 @@
 
 Simulador local de agendamiento: dado un paciente, una fecha y una hora, estima la probabilidad calibrada de inasistencia (no-show), recomienda una acción de recordatorio y explica el caso. Nada se agenda de verdad y nada sale de la máquina.
 
-> Estado: Fase 4 (núcleo del simulador y CLI). El README completo se construye en la Fase 8.
+> Estado: Fase 5 (registro de simulaciones y CI ligero). El README completo se construye en la Fase 8.
 
 ## Requisitos
 
@@ -246,3 +246,28 @@ Reglas:
 - Las otras **18 difieren solo en la edad**: el paciente tiene otro registro del mismo día con otra edad, y el simulador usa el último.
 
 `tests/test_parity_real.py` repite la verificación sobre una muestra cuando existen los datos. En CI corre la versión sintética, `tests/test_simulator.py`.
+
+## Registro de simulaciones y CI (Fase 5)
+
+Cada `simulate` se guarda en `data/simulations.db` (SQLite, ignorado por git), en la tabla `simulations`:
+- Columnas: fecha de creación, paciente, `as_of`, fecha y hora de la cita, antelación, estado, probabilidad, nivel de riesgo, acción (se llena en la Fase 7), versión del modelo, features y `simulated`.
+- **Lo simulado no se mezcla con lo real.** Un `CHECK (simulated = 1)` impide insertar filas no simuladas, y el historial real solo se lee del dataset.
+- **Datos mínimos.** De un paciente existente se guarda su `PatientId`. De un paciente nuevo, solo un hash de sus datos declarados (`nuevo:<sha256[:16]>`) y las features usadas. Las features se guardan porque la Fase 6 las necesita para medir drift.
+- Todas las consultas son parametrizadas.
+
+```bash
+uv run python -m noshow_guard.cli simulate ... --no-log                     # no registra
+uv run python -m noshow_guard.cli simulate ... --include-simulated-history  # opcional, apagado por defecto
+make model-info                                                             # versión, umbrales, costos y métricas del modelo cargado
+```
+
+`--include-simulated-history` suma al historial de un paciente existente sus citas simuladas anteriores a `as_of`. Como una simulación no tiene resultado real, esas citas se **asumen como asistidas**, y la respuesta lo advierte.
+
+**Verificación del criterio**, hecha con la CLI y los datos reales:
+- Tres simulaciones (dos válidas y una del mismo día, fuera de alcance) dejaron 3 filas con `simulated = 1`.
+- Una cuarta simulación con `--no-log` no escribió nada.
+- El SHA-256 de `data/raw/data.csv` y del parquet limpio no cambió.
+
+`tests/test_registry_real.py` automatiza esa verificación cuando existen los datos.
+
+**CI** (`.github/workflows/ci.yml`) corre `make lint`, `make test` y `make smoke`. `make smoke` ejecuta el pipeline completo con datos sintéticos (`noshow_guard.synthetic`) en un directorio temporal: datos, features, split, entrenamiento, guardado, simulación y registro. No depende del CSV de Kaggle ni toca `models/` ni `reports/`. Los tests que necesitan los datos reales se omiten en CI.
