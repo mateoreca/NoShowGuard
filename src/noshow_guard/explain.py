@@ -1,9 +1,11 @@
 """Explicaciones SHAP: importancia global y factores principales de un caso.
 
-Los valores SHAP salen de ``NoShowModel.contributions`` (TreeSHAP exacto de LightGBM) y están
+Los valores SHAP salen de ``NoShowModel.contributions``: son exactos para la regresión logística
+(coeficiente por desviación respecto a la media de train, sumado por feature original) y están
 en log-odds del modelo **sin calibrar**. La calibración es monótona, así que el signo de cada
 factor (sube o baja el riesgo) se conserva, pero la magnitud no se traduce 1:1 a puntos de
-probabilidad calibrada.
+probabilidad calibrada. Además, SHAP describe al modelo, no causas: una contribución alta de la
+antelación no prueba que acortar la antelación reduzca el no-show.
 """
 
 from __future__ import annotations
