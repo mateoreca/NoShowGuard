@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,7 @@ ACTIONS: tuple[str, ...] = (
     "recordatorio_reforzado_con_confirmacion",
 )
 THRESHOLD_GRID = np.round(np.arange(0.0, 1.0001, 0.01), 2)
+RiskLevel = Literal["bajo", "medio", "alto"]
 
 
 @dataclass(frozen=True)
@@ -142,8 +144,8 @@ def risk_cutoffs(p_reference: np.ndarray, risk: RiskConfig = RISK) -> dict[str, 
     }
 
 
-def risk_level(p: float, cutoffs: dict[str, float]) -> str:
-    """ "bajo", "medio" o "alto" según los cortes (inclusivos por abajo)."""
+def risk_level(p: float, cutoffs: dict[str, float]) -> RiskLevel:
+    """Nivel "bajo", "medio" o "alto" según los cortes (inclusivos por abajo)."""
     if p >= cutoffs["alto"]:
         return "alto"
     if p >= cutoffs["medio"]:

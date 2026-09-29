@@ -187,6 +187,12 @@ class NoShowModel:
         background = pipeline.named_steps["pre"].transform(X_train[list(FEATURE_COLUMNS)])
         return cls(pipeline, calibrator, method, np.asarray(background).mean(axis=0))
 
+    def known_neighbourhoods(self) -> list[str]:
+        """Barrios vistos al ajustar el target encoding (los demás reciben la tasa global)."""
+        pre = self.pipeline.named_steps["pre"]
+        encoder = pre.named_transformers_["neighbourhood"].named_steps["te"]
+        return [str(c) for c in encoder.categories_[0]]
+
     def raw_proba(self, X: pd.DataFrame) -> np.ndarray:
         """Probabilidad del modelo sin calibrar."""
         return np.asarray(self.pipeline.predict_proba(X[list(FEATURE_COLUMNS)])[:, 1])
