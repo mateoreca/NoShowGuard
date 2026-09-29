@@ -29,7 +29,16 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 
 from noshow_guard import plots
-from noshow_guard.config import COSTS, PATHS, RAW_SHA256, SEARCH, SEED, CostConfig, SearchConfig
+from noshow_guard.config import (
+    COSTS,
+    PATHS,
+    RAW_SHA256,
+    SEARCH,
+    SEED,
+    CostConfig,
+    Paths,
+    SearchConfig,
+)
 from noshow_guard.evaluation import (
     ACTIONS,
     Thresholds,
@@ -479,26 +488,26 @@ def build_metadata(
     }
 
 
-def save(result: TrainResult, splits: dict[str, pd.DataFrame]) -> str:
+def save(result: TrainResult, splits: dict[str, pd.DataFrame], paths: Paths = PATHS) -> str:
     """Guarda modelo, metadata, métricas y figuras. Devuelve la versión del modelo."""
     dhash = data_hash(splits)
     created = datetime.now(UTC)
     version_name = f"{created:%Y%m%d}_{dhash[:8]}"
-    PATHS.models.mkdir(parents=True, exist_ok=True)
-    PATHS.reports.mkdir(parents=True, exist_ok=True)
-    joblib.dump(result.model, PATHS.models / f"{version_name}.joblib")
+    paths.models.mkdir(parents=True, exist_ok=True)
+    paths.reports.mkdir(parents=True, exist_ok=True)
+    joblib.dump(result.model, paths.models / f"{version_name}.joblib")
 
     m = result.metrics
     metadata = build_metadata(m, version_name, dhash, created.isoformat(timespec="seconds"))
-    PATHS.model_metadata.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-    PATHS.metrics.write_text(
+    paths.model_metadata.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    paths.metrics.write_text(
         json.dumps(_json_safe({"model_version": version_name, **m}), indent=2, ensure_ascii=False)
         + "\n",
         encoding="utf-8",
     )
-    result.trials.to_csv(PATHS.reports / "search_trials.csv", index=False)
+    result.trials.to_csv(paths.reports / "search_trials.csv", index=False)
 
-    fig = PATHS.figures
+    fig = paths.figures
     c = result.curves
     plots.pr_curves(c["y_test"], c["scores_test"], fig / "pr_curves_test.png")
     plots.calibration_plot(c["y_test"], c["calibration_test"], fig / "calibration_test.png")

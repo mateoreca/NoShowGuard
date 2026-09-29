@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
@@ -11,23 +11,66 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 @dataclass(frozen=True)
 class Paths:
-    """Rutas del proyecto, relativas a la raíz del repositorio."""
+    """Rutas del proyecto derivadas de ``root``.
+
+    ``Paths(root=tmp)`` reubica todo (lo usa el entrenamiento de humo para no pisar
+    los artefactos reales).
+    """
 
     root: Path = PROJECT_ROOT
-    data_raw: Path = field(default=PROJECT_ROOT / "data" / "raw")
-    data_processed: Path = field(default=PROJECT_ROOT / "data" / "processed")
-    raw_csv: Path = field(default=PROJECT_ROOT / "data" / "raw" / "data.csv")
-    clean_parquet: Path = field(
-        default=PROJECT_ROOT / "data" / "processed" / "appointments_clean.parquet"
-    )
-    reports: Path = field(default=PROJECT_ROOT / "reports")
-    cleaning_report: Path = field(default=PROJECT_ROOT / "reports" / "data_cleaning.json")
-    features_dir: Path = field(default=PROJECT_ROOT / "data" / "processed" / "features")
-    split_summary: Path = field(default=PROJECT_ROOT / "reports" / "split_summary.json")
-    figures: Path = field(default=PROJECT_ROOT / "reports" / "figures")
-    metrics: Path = field(default=PROJECT_ROOT / "reports" / "metrics.json")
-    models: Path = field(default=PROJECT_ROOT / "models")
-    model_metadata: Path = field(default=PROJECT_ROOT / "models" / "metadata.json")
+
+    @property
+    def data_raw(self) -> Path:
+        return self.root / "data" / "raw"
+
+    @property
+    def data_processed(self) -> Path:
+        return self.root / "data" / "processed"
+
+    @property
+    def raw_csv(self) -> Path:
+        return self.data_raw / "data.csv"
+
+    @property
+    def clean_parquet(self) -> Path:
+        return self.data_processed / "appointments_clean.parquet"
+
+    @property
+    def features_dir(self) -> Path:
+        return self.data_processed / "features"
+
+    @property
+    def registry_db(self) -> Path:
+        """Registro SQLite de simulaciones (ignorado por git)."""
+        return self.root / "data" / "simulations.db"
+
+    @property
+    def reports(self) -> Path:
+        return self.root / "reports"
+
+    @property
+    def cleaning_report(self) -> Path:
+        return self.reports / "data_cleaning.json"
+
+    @property
+    def split_summary(self) -> Path:
+        return self.reports / "split_summary.json"
+
+    @property
+    def figures(self) -> Path:
+        return self.reports / "figures"
+
+    @property
+    def metrics(self) -> Path:
+        return self.reports / "metrics.json"
+
+    @property
+    def models(self) -> Path:
+        return self.root / "models"
+
+    @property
+    def model_metadata(self) -> Path:
+        return self.models / "metadata.json"
 
 
 @dataclass(frozen=True)

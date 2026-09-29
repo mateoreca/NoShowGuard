@@ -1,7 +1,8 @@
 """Núcleo del simulador: una cita hipotética -> probabilidad calibrada y explicación.
 
 No agenda nada ni escribe en el dataset. Usa ``build_features`` (el mismo pipeline del
-entrenamiento) y el modelo principal indicado en ``models/metadata.json``.
+entrenamiento) y el modelo principal indicado en ``models/metadata.json``. Cada simulación
+se guarda, marcada como simulada, en el registro SQLite (salvo ``log=False``).
 
 Paciente existente:
 - Atributos: los del último registro del paciente agendado a más tardar en ``as_of`` (los
@@ -17,7 +18,7 @@ from typing import Any
 
 import pandas as pd
 
-from noshow_guard.config import MIN_LEAD_DAYS
+from noshow_guard.config import MIN_LEAD_DAYS, PATHS, Paths
 from noshow_guard.data import load_clean
 from noshow_guard.evaluation import risk_level
 from noshow_guard.explain import top_factors
@@ -31,6 +32,7 @@ from noshow_guard.features import (
     lead_time_days,
 )
 from noshow_guard.model import NoShowModel, load_model
+from noshow_guard.registry import Registry
 from noshow_guard.schemas import Factor, NewPatient, SimulationRequest, SimulationResult
 
 FIXED_NOTES: tuple[str, ...] = (
@@ -59,10 +61,15 @@ class Simulator:
     records: pd.DataFrame
     history: dict[str, list[PastAppointment]]
     known_neighbourhoods: frozenset[str]
+    registry: Registry | None = None
 
     @classmethod
     def build(
-        cls, model: NoShowModel, metadata: dict[str, Any], records: pd.DataFrame
+        cls,
+        model: NoShowModel,
+        metadata: dict[str, Any],
+        records: pd.DataFrame,
+        registry: Registry | None = None,
     ) -> Simulator:
         """Prepara el simulador a partir de un modelo y del dataset limpio."""
         ordered = records.sort_values(["scheduled_at", "appointment_id"]).reset_index(drop=True)
@@ -72,13 +79,16 @@ class Simulator:
             records=ordered,
             history=history_index(ordered),
             known_neighbourhoods=frozenset(model.known_neighbourhoods()),
+            registry=registry,
         )
 
     @classmethod
-    def from_disk(cls) -> Simulator:
-        """Carga el modelo principal (vía metadata) y el dataset limpio."""
-        model, metadata = load_model()
-        return cls.build(model, metadata, load_clean())
+    def from_disk(cls, paths: Paths = PATHS) -> Simulator:
+        """Carga el modelo principal (vía metadata), el dataset limpio y el registro."""
+        model, metadata = load_model(paths.model_metadata)
+        return cls.build(
+            model, metadata, load_clean(paths.clean_parquet), Registry(paths.registry_db)
+        )
 
     # --- Paciente ------------------------------------------------------------
 
@@ -149,8 +159,24 @@ class Simulator:
 
     # --- Simulación ----------------------------------------------------------
 
-    def simulate(self, request: SimulationRequest) -> SimulationResult:
-        """Evalúa una cita hipotética sin agendarla."""
+    def simulated_history(
+        self, patient_id: str, as_of: date
+    ) -> tuple[list[PastAppointment], list[str]]:
+        """Citas simuladas previas del paciente (opcional), con la advertencia correspondiente."""
+        if self.registry is None:
+            return [], ["No hay registro de simulaciones configurado: se ignora esa opción."]
+        extra = self.registry.simulated_history(patient_id, as_of)
+        if not extra:
+            return [], []
+        return extra, [
+            f"Se incluyeron {len(extra)} cita(s) simulada(s) anteriores a as_of en el historial, "
+            "ASUMIDAS COMO ASISTIDAS (una simulación no tiene resultado real)."
+        ]
+
+    def evaluate(
+        self, request: SimulationRequest, include_simulated_history: bool = False
+    ) -> SimulationResult:
+        """Evalúa una cita hipotética sin agendarla ni registrarla."""
         lead = lead_time_days(request.appointment_date, request.as_of)
         common = {
             "lead_time_days": lead,
@@ -168,6 +194,9 @@ class Simulator:
             cita, history, warnings = self.existing_patient(
                 request.patient_id, request.as_of, request.appointment_date
             )
+            if include_simulated_history:
+                extra, extra_warnings = self.simulated_history(request.patient_id, request.as_of)
+                history, warnings = history + extra, warnings + extra_warnings
         else:
             assert request.new_patient is not None
             cita, history = self.new_patient(request.new_patient, request.appointment_date), []
@@ -187,6 +216,18 @@ class Simulator:
             **common,
         )
 
+    def simulate(
+        self,
+        request: SimulationRequest,
+        log: bool = True,
+        include_simulated_history: bool = False,
+    ) -> SimulationResult:
+        """Evalúa la cita y, si hay registro y ``log`` es True, la guarda como simulada."""
+        result = self.evaluate(request, include_simulated_history)
+        if log and self.registry is not None:
+            self.registry.log(request, result)
+        return result
+
 
 _DEFAULT: Simulator | None = None
 
@@ -199,6 +240,12 @@ def get_simulator() -> Simulator:
     return _DEFAULT
 
 
-def simulate(request: SimulationRequest, simulator: Simulator | None = None) -> SimulationResult:
-    """Punto de entrada: ``simulate(request) -> SimulationResult``."""
-    return (simulator or get_simulator()).simulate(request)
+def simulate(
+    request: SimulationRequest,
+    simulator: Simulator | None = None,
+    *,
+    log: bool = True,
+    include_simulated_history: bool = False,
+) -> SimulationResult:
+    """Punto de entrada: ``simulate(request) -> SimulationResult``. Registra por defecto."""
+    return (simulator or get_simulator()).simulate(request, log, include_simulated_history)
