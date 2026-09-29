@@ -1,5 +1,5 @@
 # Comandos del proyecto. Los objetivos de fases futuras se agregan cuando existen.
-.PHONY: setup test lint format data eda
+.PHONY: setup test lint format data features eda
 
 setup:  ## Instala Python 3.11 y dependencias exactas desde uv.lock
 	uv sync --locked
@@ -19,6 +19,9 @@ format:  ## Aplica formato y autocorrecciones
 data:  ## Verifica el CSV crudo y genera data/processed/appointments_clean.parquet
 	uv run python scripts/download_data.py
 	uv run python -m noshow_guard.data
+
+features:  ## Features sin fuga + split cronológico -> data/processed/features/*.parquet
+	uv run python -m noshow_guard.features
 
 eda: data  ## Ejecuta el notebook de EDA y guarda sus salidas
 	uv run jupyter nbconvert --to notebook --execute --inplace notebooks/01_eda.ipynb

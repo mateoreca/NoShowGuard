@@ -1,0 +1,32 @@
+{
+  "train": {
+    "rows": 43937,
+    "share": 0.6106,
+    "no_show_rate": 0.2964,
+    "date_min": "2016-04-29",
+    "date_max": "2016-05-20",
+    "n_dates": 17,
+    "share_with_history": 0.1304,
+    "share_patient_seen_in_train": 1.0
+  },
+  "val": {
+    "rows": 10671,
+    "share": 0.1483,
+    "no_show_rate": 0.2801,
+    "date_min": "2016-05-24",
+    "date_max": "2016-05-31",
+    "n_dates": 4,
+    "share_with_history": 0.3286,
+    "share_patient_seen_in_train": 0.4454
+  },
+  "test": {
+    "rows": 17344,
+    "share": 0.241,
+    "no_show_rate": 0.26,
+    "date_min": "2016-06-01",
+    "date_max": "2016-06-08",
+    "n_dates": 6,
+    "share_with_history": 0.4149,
+    "share_patient_seen_in_train": 0.4203
+  }
+}
