@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score, brier_score_loss, log_loss, roc_auc_score
 
-from noshow_guard.config import COSTS, CostConfig
+from noshow_guard.config import COSTS, RISK, CostConfig, RiskConfig
 
 ACTIONS: tuple[str, ...] = (
     "sin_accion",
@@ -129,6 +129,26 @@ def optimize_thresholds(
     distance = (best["standard"] - ref.standard).abs() + (best["reinforced"] - ref.reinforced).abs()
     row = best.loc[distance.idxmin()]
     return Thresholds(float(row["standard"]), float(row["reinforced"])), table
+
+
+# --- Nivel de riesgo -----------------------------------------------------------
+
+
+def risk_cutoffs(p_reference: np.ndarray, risk: RiskConfig = RISK) -> dict[str, float]:
+    """Cortes de nivel de riesgo a partir de percentiles de una distribución de referencia."""
+    return {
+        "medio": float(np.quantile(p_reference, risk.medium_quantile)),
+        "alto": float(np.quantile(p_reference, risk.high_quantile)),
+    }
+
+
+def risk_level(p: float, cutoffs: dict[str, float]) -> str:
+    """ "bajo", "medio" o "alto" según los cortes (inclusivos por abajo)."""
+    if p >= cutoffs["alto"]:
+        return "alto"
+    if p >= cutoffs["medio"]:
+        return "medio"
+    return "bajo"
 
 
 # --- Segmentos -----------------------------------------------------------------

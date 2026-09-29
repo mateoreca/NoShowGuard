@@ -67,6 +67,18 @@ class CostConfig:
 
 
 @dataclass(frozen=True)
+class RiskConfig:
+    """Niveles de riesgo relativos: percentiles de la probabilidad calibrada en validación.
+
+    Es un ranking (qué tan alto es el riesgo frente a otras citas), distinto de la acción,
+    que depende de los umbrales por costo.
+    """
+
+    medium_quantile: float = 0.50
+    high_quantile: float = 0.90
+
+
+@dataclass(frozen=True)
 class SearchConfig:
     """Búsqueda aleatoria de hiperparámetros de LightGBM."""
 
@@ -82,6 +94,7 @@ DATA_RULES = DataRules()
 SPLIT = SplitConfig()
 COSTS = CostConfig()
 SEARCH = SearchConfig()
+RISK = RiskConfig()
 
 # Citas con antelación menor a esto quedan fuera del alcance del modelo (mismo día).
 MIN_LEAD_DAYS: int = 1

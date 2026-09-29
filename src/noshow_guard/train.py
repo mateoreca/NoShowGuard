@@ -38,6 +38,7 @@ from noshow_guard.evaluation import (
     binary_metrics,
     mean_cost,
     optimize_thresholds,
+    risk_cutoffs,
     score_metrics,
     segment_table,
 )
@@ -81,7 +82,8 @@ MODEL_DECISION: dict[str, Any] = {
     "motivo": (
         "La regresión logística y LightGBM empatan en PR-AUC de validación (diferencia < 0,0001) "
         "y en los 3 cortes temporales con origen móvil (train + validación, sin test) no hay "
-        "ganador consistente: diferencias de +0,007, -0,001 y 0,000 para LightGBM. Ante un "
+        "ganador consistente: diferencias de +0,007, -0,001 y 0,000 para LightGBM (cifras al "
+        "momento de decidir, con conteos de historial lineales; ver ADR 0002). Ante un "
         "empate se prefiere el modelo más simple y explicable. La decisión se tomó después de "
         "ver test, donde LightGBM quedó por debajo; no se hizo otra selección de LightGBM "
         "contra test."
@@ -398,6 +400,8 @@ def fit_all(
             "val": _policy_costs(p_val, y_val, thresholds, costs),
             "test": _policy_costs(p_te, y_te, thresholds, costs),
         },
+        "risk_cutoffs": risk_cutoffs(p_val),
+        "history_counts_transform": "log1p (ADR 0002)",
         "action_counts_test": {
             action: int(np.sum(assign_actions(p_te, thresholds) == i))
             for i, action in enumerate(ACTIONS)
@@ -446,6 +450,35 @@ def _json_safe(obj: Any) -> Any:
     return obj
 
 
+def build_metadata(
+    metrics: dict[str, Any], version_name: str, dhash: str, created_at: str
+) -> dict[str, Any]:
+    """Metadata que acompaña al modelo: la leen el simulador y las acciones."""
+    return {
+        "model_version": version_name,
+        "model_file": f"{version_name}.joblib",
+        "created_at": created_at,
+        "data_hash": dhash,
+        "raw_sha256": RAW_SHA256,
+        "seed": SEED,
+        "features": list(FEATURE_COLUMNS),
+        "principal_model": PRINCIPAL_MODEL,
+        "model_decision": MODEL_DECISION,
+        "calibration_method": metrics["calibration"]["method"],
+        "thresholds": metrics["thresholds"],
+        "analytic_thresholds": metrics["analytic_thresholds"],
+        "actions": list(ACTIONS),
+        "costs": metrics["costs"],
+        "costs_are_assumptions": True,
+        "risk_cutoffs": metrics["risk_cutoffs"],
+        "train_ranges": metrics["train_ranges"],
+        "test_metrics": {k: round(v, 4) for k, v in metrics["test"][PRINCIPAL_MODEL].items()},
+        "libraries": {
+            lib: version(lib) for lib in ("scikit-learn", "lightgbm", "pandas", "numpy", "shap")
+        },
+    }
+
+
 def save(result: TrainResult, splits: dict[str, pd.DataFrame]) -> str:
     """Guarda modelo, metadata, métricas y figuras. Devuelve la versión del modelo."""
     dhash = data_hash(splits)
@@ -456,28 +489,7 @@ def save(result: TrainResult, splits: dict[str, pd.DataFrame]) -> str:
     joblib.dump(result.model, PATHS.models / f"{version_name}.joblib")
 
     m = result.metrics
-    metadata = {
-        "model_version": version_name,
-        "model_file": f"{version_name}.joblib",
-        "created_at": created.isoformat(timespec="seconds"),
-        "data_hash": dhash,
-        "raw_sha256": RAW_SHA256,
-        "seed": SEED,
-        "features": list(FEATURE_COLUMNS),
-        "principal_model": PRINCIPAL_MODEL,
-        "model_decision": MODEL_DECISION,
-        "calibration_method": m["calibration"]["method"],
-        "thresholds": m["thresholds"],
-        "analytic_thresholds": m["analytic_thresholds"],
-        "actions": list(ACTIONS),
-        "costs": m["costs"],
-        "costs_are_assumptions": True,
-        "train_ranges": m["train_ranges"],
-        "test_metrics": {k: round(v, 4) for k, v in m["test"][PRINCIPAL_MODEL].items()},
-        "libraries": {
-            lib: version(lib) for lib in ("scikit-learn", "lightgbm", "pandas", "numpy", "shap")
-        },
-    }
+    metadata = build_metadata(m, version_name, dhash, created.isoformat(timespec="seconds"))
     PATHS.model_metadata.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     PATHS.metrics.write_text(
         json.dumps(_json_safe({"model_version": version_name, **m}), indent=2, ensure_ascii=False)

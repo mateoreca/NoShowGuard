@@ -97,6 +97,20 @@ def test_changing_one_feature_changes_only_its_contribution(
     assert changed == ["age"]
 
 
+def test_history_counts_are_log_transformed(
+    result: TrainResult, synthetic_splits: dict[str, pd.DataFrame]
+) -> None:
+    # Con log1p, pasar de 10 a 100 citas previas mueve la contribución mucho menos que 10x.
+    row = synthetic_splits["test"].iloc[[0]]
+    contrib = {
+        n: result.model.contributions(row.assign(prev_appointments=n)).iloc[0]["prev_appointments"]
+        for n in (0, 10, 100)
+    }
+    step_small = abs(contrib[10] - contrib[0])
+    step_big = abs(contrib[100] - contrib[10])
+    assert step_big < 2 * step_small
+
+
 def test_top_factors_sorted_by_magnitude(
     result: TrainResult, synthetic_splits: dict[str, pd.DataFrame]
 ) -> None:

@@ -14,6 +14,8 @@ from noshow_guard.evaluation import (
     assign_actions,
     binary_metrics,
     optimize_thresholds,
+    risk_cutoffs,
+    risk_level,
     score_metrics,
     segment_table,
 )
@@ -61,6 +63,18 @@ def test_optimized_thresholds_match_analytic_when_calibrated() -> None:
     assert th.standard == pytest.approx(ref.standard, abs=0.03)
     assert th.reinforced == pytest.approx(ref.reinforced, abs=0.03)
     assert (table["reinforced"] >= table["standard"]).all()
+
+
+def test_risk_cutoffs_are_quantiles_of_reference() -> None:
+    cutoffs = risk_cutoffs(np.arange(101) / 100)
+    assert cutoffs == {"medio": pytest.approx(0.5), "alto": pytest.approx(0.9)}
+
+
+@pytest.mark.parametrize(
+    ("p", "expected"), [(0.1, "bajo"), (0.28, "medio"), (0.3, "medio"), (0.37, "alto")]
+)
+def test_risk_level_boundaries(p: float, expected: str) -> None:
+    assert risk_level(p, {"medio": 0.28, "alto": 0.37}) == expected
 
 
 def test_binary_metrics() -> None:

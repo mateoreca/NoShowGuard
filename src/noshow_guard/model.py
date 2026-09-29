@@ -19,7 +19,13 @@ from sklearn.compose import ColumnTransformer
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import KBinsDiscretizer, OneHotEncoder, StandardScaler, TargetEncoder
+from sklearn.preprocessing import (
+    FunctionTransformer,
+    KBinsDiscretizer,
+    OneHotEncoder,
+    StandardScaler,
+    TargetEncoder,
+)
 
 from noshow_guard.config import PATHS, SEED
 from noshow_guard.features import FEATURE_COLUMNS
@@ -29,7 +35,9 @@ _EPS = 1e-6
 
 # Features binarias: entran sin transformar al modelo lineal.
 _PASSTHROUGH = ("is_male", "scholarship", "hypertension", "diabetes", "alcoholism", "has_history")
-_SCALED = ("handicap", "prev_appointments", "prev_no_shows", "prev_no_show_rate")
+_SCALED = ("handicap", "prev_no_show_rate")
+# Conteos de historial: log1p antes de escalar para que valores extremos no extrapolen lineal.
+_LOG_SCALED = ("prev_appointments", "prev_no_shows")
 
 
 def _neighbourhood_encoder() -> TargetEncoder:
@@ -46,12 +54,22 @@ def _quantile_bins() -> KBinsDiscretizer:
     )
 
 
+def _log_scaler() -> Pipeline:
+    return Pipeline(
+        [
+            ("log", FunctionTransformer(np.log1p, feature_names_out="one-to-one")),
+            ("sc", StandardScaler()),
+        ]
+    )
+
+
 def make_logistic_pipeline() -> Pipeline:
     """Regresión logística con un transformador por feature original.
 
     Cada transformador se llama como su feature, así las columnas de salida
     (``<feature>__<columna>``) se agregan sin ambigüedad al explicar con SHAP.
     Edad y antelación van en bins por cuantiles porque su relación con el no-show no es lineal.
+    Los conteos de historial pasan por ``log1p`` (ADR 0002).
     """
     transformers: list[tuple[str, Any, list[str]]] = [
         (
@@ -67,6 +85,7 @@ def make_logistic_pipeline() -> Pipeline:
             ["appointment_weekday"],
         ),
         *[(name, StandardScaler(), [name]) for name in _SCALED],
+        *[(name, _log_scaler(), [name]) for name in _LOG_SCALED],
         *[(name, "passthrough", [name]) for name in _PASSTHROUGH],
     ]
     pre = ColumnTransformer(transformers, remainder="drop", sparse_threshold=0.0)
