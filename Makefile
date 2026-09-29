@@ -1,5 +1,5 @@
-# Comandos del proyecto. Los objetivos data/train/serve/monitor se agregan en sus fases.
-.PHONY: setup test lint format typecheck
+# Comandos del proyecto. Los objetivos de fases futuras se agregan cuando existen.
+.PHONY: setup test lint format data eda
 
 setup:  ## Instala Python 3.11 y dependencias exactas desde uv.lock
 	uv sync --locked
@@ -15,3 +15,10 @@ lint:  ## Lint + formato (verificación) + tipos
 format:  ## Aplica formato y autocorrecciones
 	uv run ruff format .
 	uv run ruff check --fix .
+
+data:  ## Verifica el CSV crudo y genera data/processed/appointments_clean.parquet
+	uv run python scripts/download_data.py
+	uv run python -m noshow_guard.data
+
+eda: data  ## Ejecuta el notebook de EDA y guarda sus salidas
+	uv run jupyter nbconvert --to notebook --execute --inplace notebooks/01_eda.ipynb

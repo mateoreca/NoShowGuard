@@ -1,0 +1,10 @@
+{
+  "raw_sha256": "9132d3e7d0246617df9041d3764f20ad6f08e7b0d9f0997fa254fc5e52eda27d",
+  "rows_in": 110527,
+  "rows_out": 110511,
+  "dropped": {
+    "patient_id_corrupto": 5,
+    "edad_fuera_de_rango": 6,
+    "cita_antes_de_agendamiento": 5
+  }
+}

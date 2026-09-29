@@ -1,4 +1,4 @@
-"""Configuración central del proyecto: rutas y semilla global."""
+"""Configuración central del proyecto: rutas, semilla y reglas de datos."""
 
 from __future__ import annotations
 
@@ -16,7 +16,26 @@ class Paths:
     data_raw: Path = field(default=PROJECT_ROOT / "data" / "raw")
     data_processed: Path = field(default=PROJECT_ROOT / "data" / "processed")
     raw_csv: Path = field(default=PROJECT_ROOT / "data" / "raw" / "data.csv")
+    clean_parquet: Path = field(
+        default=PROJECT_ROOT / "data" / "processed" / "appointments_clean.parquet"
+    )
+    reports: Path = field(default=PROJECT_ROOT / "reports")
+    cleaning_report: Path = field(default=PROJECT_ROOT / "reports" / "data_cleaning.json")
+
+
+@dataclass(frozen=True)
+class DataRules:
+    """Rangos válidos usados por la limpieza y la validación (y luego por el simulador)."""
+
+    age_min: int = 0
+    # 115 años aparece en 5 filas de 2 pacientes; se considera error de captura.
+    age_max: int = 110
+    handicap_max: int = 4
 
 
 SEED: int = 42
 PATHS = Paths()
+DATA_RULES = DataRules()
+
+# SHA-256 del CSV de Kaggle (joniarroba/noshowappointments, versión 5) usado en el proyecto.
+RAW_SHA256 = "9132d3e7d0246617df9041d3764f20ad6f08e7b0d9f0997fa254fc5e52eda27d"
