@@ -1,7 +1,7 @@
 {
   "model_version": "20260929_c823f970",
   "model_file": "20260929_c823f970.joblib",
-  "created_at": "2026-09-29T18:41:07+00:00",
+  "created_at": "2026-09-29T18:54:08+00:00",
   "data_hash": "c823f97010622bc4fbb6fbfb96b385291ee4b01bd2b58cf395f586315aa4f6d3",
   "raw_sha256": "9132d3e7d0246617df9041d3764f20ad6f08e7b0d9f0997fa254fc5e52eda27d",
   "seed": 42,
@@ -21,11 +21,28 @@
     "prev_no_shows",
     "prev_no_show_rate"
   ],
+  "principal_model": "regresion_logistica_calibrada",
+  "model_decision": {
+    "principal": "regresion_logistica_calibrada",
+    "comparacion": "lightgbm_calibrado",
+    "decidido_despues_de_ver_test": true,
+    "motivo": "La regresi\u00f3n log\u00edstica y LightGBM empatan en PR-AUC de validaci\u00f3n (diferencia < 0,0001) y en los 3 cortes temporales con origen m\u00f3vil (train + validaci\u00f3n, sin test) no hay ganador consistente: diferencias de +0,007, -0,001 y 0,000 para LightGBM. Ante un empate se prefiere el modelo m\u00e1s simple y explicable. La decisi\u00f3n se tom\u00f3 despu\u00e9s de ver test, donde LightGBM qued\u00f3 por debajo; no se hizo otra selecci\u00f3n de LightGBM contra test.",
+    "adr": "docs/adr/0001-modelo-principal.md"
+  },
   "calibration_method": "platt",
   "thresholds": {
-    "standard": 0.33,
+    "standard": 0.35,
     "reinforced": 0.67
   },
+  "analytic_thresholds": {
+    "standard": 0.3333333333333333,
+    "reinforced": 0.6666666666666666
+  },
+  "actions": [
+    "sin_accion",
+    "recordatorio_estandar",
+    "recordatorio_reforzado_con_confirmacion"
+  ],
   "costs": {
     "no_show_cost": 20.0,
     "standard_cost": 1.0,
@@ -33,26 +50,18 @@
     "standard_effect": 0.15,
     "reinforced_effect": 0.3
   },
-  "best_params": {
-    "learning_rate": 0.1,
-    "num_leaves": 15.0,
-    "min_child_samples": 20.0,
-    "subsample": 0.85,
-    "colsample_bytree": 1.0,
-    "reg_lambda": 0.0,
-    "best_iteration": 216.0
-  },
+  "costs_are_assumptions": true,
   "train_ranges": {
     "lead_time_days_max": 176,
     "age_min": 0,
     "age_max": 98
   },
   "test_metrics": {
-    "pr_auc": 0.3209,
+    "pr_auc": 0.3337,
     "prevalence": 0.26,
-    "roc_auc": 0.5888,
-    "brier": 0.1891,
-    "log_loss": 0.5643
+    "roc_auc": 0.6026,
+    "brier": 0.1878,
+    "log_loss": 0.561
   },
   "libraries": {
     "scikit-learn": "1.7.2",
