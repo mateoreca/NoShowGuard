@@ -1,24 +1,161 @@
 # noshow-guard
 
-Simulador local de agendamiento: dado un paciente, una fecha y una hora, estima la probabilidad calibrada de inasistencia (no-show), recomienda una acción de recordatorio y explica el caso. Nada se agenda de verdad y nada sale de la máquina.
+Simulador local de agendamiento de citas médicas con ML. Recibe un paciente, una fecha y una hora, y devuelve:
+- la **probabilidad calibrada** de que el paciente no asista,
+- el **nivel de riesgo**,
+- la **acción** que recomendaría y el **mensaje** que se habría enviado,
+- los **3 factores SHAP** principales del caso.
 
-> Estado: Fase 7 (acciones, mensajes simulados e impacto). El README completo se construye en la Fase 8.
+**Nada se agenda de verdad y nada sale de la máquina.**
 
-## Requisitos
+> **La probabilidad es ilustrativa.** El modelo se entrenó con citas públicas de Brasil (2016), no con datos de una clínica real. La hora de la cita se registra, pero no influye en la predicción. Los resultados de impacto son **simulaciones** con supuestos explícitos.
 
-- [uv](https://docs.astral.sh/uv/) 0.8.x (instala Python 3.11 automáticamente)
-- GNU Make (en Windows: `winget install ezwinports.make`)
+## Demo
 
-## Inicio rápido
+```bash
+uv run python -m noshow_guard.cli simulate --age 20 --gender M --neighbourhood "itararé" --scholarship \
+    --alcoholism --date 2016-07-04 --time 10:00 --as-of 2016-06-01 --no-log
+```
+
+```text
+[MockSender] mensaje simulado, NO enviado: Hola. Te recordamos tu cita del lunes 4 de julio de 2016 a las 10:00. Si no puedes asistir, avísanos para liberar el espacio.
+```
+
+```json
+{
+  "status": "ok",
+  "probability_no_show": 0.5422,
+  "risk_level": "alto",
+  "lead_time_days": 33,
+  "action": "recordatorio_estandar",
+  "message_preview": "Hola. Te recordamos tu cita del lunes 4 de julio de 2016 a las 10:00. ...",
+  "top_factors": [
+    {"feature": "alcoholism", "effect": "+", "value": 1, "shap": 0.3456},
+    {"feature": "age", "effect": "+", "value": 20, "shap": 0.3298},
+    {"feature": "neighbourhood", "effect": "+", "value": "ITARARÉ", "shap": 0.3266}
+  ],
+  "notes": ["La hora de la cita no influye en la predicción: ...", "Modelo entrenado con datos de Brasil (2016), ...", "..."]
+}
+```
+
+`what-if` repite la misma cita variando la antelación. Muestra una **asociación aprendida, no un efecto causal**.
+
+```bash
+uv run python -m noshow_guard.cli what-if --age 24 --gender F --neighbourhood "jardim da penha" --scholarship \
+    --date 2016-06-14 --time 08:30 --lead-times 1 3 7 14 30 60 --plot reports/figures/what_if_example.png
+```
+
+| Antelación (días) | 1 | 3 | 7 | 14 | 30 | 60 |
+|---|---|---|---|---|---|---|
+| Probabilidad | 0,262 | 0,275 | 0,299 | 0,344 | 0,349 | 0,361 |
+| Acción | sin acción | sin acción | sin acción | sin acción | sin acción | recordatorio |
+
+## El problema
+
+Un paciente que no asiste deja un hueco en la agenda que otro paciente pudo usar. Recordarle la cita a todos tiene un costo, y la mayoría asiste de todos modos. La pregunta es a quién recordar, con qué intensidad y cuánto vale hacerlo. Para responderla hace falta:
+- una probabilidad **en la que se pueda confiar como probabilidad**, es decir, calibrada;
+- un **umbral de decisión basado en costos**;
+- **honestidad** sobre cuánto aporta el modelo frente a reglas simples.
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+    CSV["data/raw/data.csv<br/>Kaggle, 110.527 citas"] --> DATA["data.py<br/>limpieza + validación"]
+    DATA --> CLEAN[("appointments_clean.parquet")]
+    CLEAN --> FEAT["features.py<br/>build_features(cita, historial, as_of)"]
+    FEAT --> SPLIT["split cronológico<br/>train / val / test"]
+    SPLIT --> TRAIN["train.py<br/>reg. logística + Platt<br/>LightGBM (comparación)<br/>umbrales por costo"]
+    TRAIN --> MODEL[("models/*.joblib<br/>metadata.json")]
+    CLI["cli.py<br/>simulate / what-if / model-info"] --> SIM["simulator.py"]
+    SIM --> FEAT
+    SIM --> MODEL
+    SIM --> ACT["actions.py<br/>decide_action + MockSender"]
+    SIM --> REG[("registry.py<br/>simulations.db, simulated = 1")]
+    MODEL --> DRIFT["drift.py<br/>PSI / KS / chi²"]
+    REG --> DRIFT
+    DRIFT --> DR["reports/drift_report.md"]
+    MODEL --> IMP["impact.py<br/>3 escenarios de supuestos"]
+    IMP --> IR["reports/impact.md"]
+```
+
+El principio central es que **hay un solo pipeline de features**: el entrenamiento y el simulador llaman a la misma función `build_features`, y el historial de un paciente solo cuenta citas terminadas antes de `as_of`.
+
+## Cómo ejecutar
+
+Requisitos: [uv](https://docs.astral.sh/uv/) 0.8.x, que instala Python 3.11 automáticamente, y GNU Make (en Windows: `winget install ezwinports.make`). Descarga el CSV de Kaggle a `data/raw/data.csv` (ver `scripts/download_data.py`).
 
 ```bash
 make setup      # dependencias exactas desde uv.lock
-make test
-make lint       # ruff + mypy
-make data       # verifica hash, limpia y valida -> data/processed/appointments_clean.parquet
-make features   # features sin fuga + split cronológico -> data/processed/features/
-make eda        # ejecuta notebooks/01_eda.ipynb
+make data       # verifica hash, limpia y valida
+make features   # features sin fuga + split cronológico
+make train      # modelos, calibración, umbrales, SHAP -> models/, reports/
+make monitor    # reporte de drift
+make impact     # simulación de impacto
+make test lint  # 157 tests; ruff + mypy
+make smoke      # pipeline completo con datos sintéticos (lo que corre en CI)
 ```
+
+## Resultados
+
+Las cifras son reales, calculadas sobre test (17.344 citas del 2016-06-01 al 2016-06-08) y sin redondear a favor.
+
+| | Resultado |
+|---|---|
+| Modelo principal | Regresión logística calibrada: **PR-AUC 0,333** (prevalencia 0,260), ROC-AUC 0,602, Brier 0,1878 |
+| Baselines | Clase mayoritaria 0,260; regla de antelación 0,290; LightGBM calibrado 0,321 |
+| Paridad simulador/offline | 17.326 de 17.344 citas con features idénticas (Δp máx. 2,2 × 10⁻¹⁶); las 18 restantes difieren solo en la edad |
+| Drift | Control **estable**; drift inducido **detectado**; el test real muestra drift en el historial por la ventana recortada |
+| Impacto (**simulación**) | Con los supuestos base, la política del modelo ahorra 0,2 % frente a no hacer nada. Con umbrales ajustados en validación a cada escenario, iguala o supera a "recordar a todos" y a "no hacer nada" en los tres |
+
+La señal es modesta: el modelo prioriza mejor que el azar y que las reglas simples, pero separa mal los casos individuales. Las secciones de detalle, más abajo, tienen las tablas, las figuras y las limitaciones completas.
+
+## Decisiones de diseño
+
+| Decisión | Por qué | ADR |
+|---|---|---|
+| Regresión logística como modelo principal, LightGBM como comparación | Empatan en validación y en 3 cortes temporales; ante un empate, el más simple y explicable. Se decidió **después de ver test**, y así se declara | [0001](docs/adr/0001-modelo-principal.md) |
+| `log1p` en los conteos de historial | Evita la extrapolación lineal extrema; se decidió solo con validación y una regla fijada de antemano | [0002](docs/adr/0002-log-conteos-historial.md) |
+| Split cronológico, no aleatorio | Simula "entrenar con mayo y predecir junio"; un split aleatorio infla las métricas | [0003](docs/adr/0003-split-temporal.md) |
+| `as_of` como momento de la predicción; sin SMS, fechas absolutas ni hora | Cero fuga: el historial solo usa citas terminadas; el SMS es una intervención confundida | [0004](docs/adr/0004-as-of-y-features-excluidas.md) |
+| Calibración Platt y umbrales por costo | La salida es una decisión con costos asimétricos, no un 0,5 arbitrario | [0005](docs/adr/0005-calibracion-y-umbral-por-costo.md) |
+
+Otros documentos: [model card](docs/model_card.md), [calidad de datos](docs/data_quality.md), [plan de reentrenamiento](docs/retraining_plan.md) y [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
+
+## Limitaciones
+
+- **Discriminación modesta** (ROC-AUC 0,60) y beneficio económico casi nulo bajo los supuestos base.
+- **Casi no detecta a los mayores:** el recall es prácticamente 0 desde los 56 años.
+- **Sesgo de asignación por beca y edad:** se marca al 26,4 % de las citas con beca, contra el 6,4 % sin beca.
+- **Ventana de 27 días:** el historial está recortado y cambia de distribución entre train y test (13 % contra 41 %).
+- **Test ya no está limpio para el modelo principal:** se miró al elegir el modelo y otra vez al aplicar `log1p`.
+- **Los efectos de los recordatorios son supuestos.** El recordatorio reforzado nunca se activa con los supuestos base.
+- **Brasil 2016:** las probabilidades no se transfieren a otra clínica sin reentrenar.
+
+## Siguientes pasos
+
+1. **Medir el efecto real del recordatorio** con un experimento aleatorizado antes de fijar umbrales. Es lo que más cambia la conclusión.
+2. **Reentrenar con datos locales y una ventana más larga**, siguiendo el plan campeón/retador.
+3. **Revisar la equidad por edad y beca** antes de cualquier uso real, por ejemplo con umbrales por grupo o una revisión humana del impacto.
+4. **Monitorear el desempeño con etiquetas** (PR-AUC y calibración en ventanas recientes), además del drift de datos.
+5. **API opcional** (`POST /simulate` con FastAPI) que solo envuelva `simulate()`. Si sale de la máquina local, necesita autenticación.
+
+## Estructura del repositorio
+
+```
+src/noshow_guard/   data, features, model, train, evaluation, explain, plots,
+                    schemas, simulator, cli, registry, actions (+ templates/), drift,
+                    impact, synthetic, smoke, formatting, config
+tests/              157 tests: anti-fuga, paridad, registro, drift, acciones, impacto
+docs/               model_card, data_quality, retraining_plan, adr/0001-0005
+reports/            metrics.json, drift_report.md, impact.md, figures/
+notebooks/          01_eda.ipynb
+models/             metadata.json (el .joblib se regenera con make train)
+```
+
+---
+
+# Detalle técnico
 
 ## Datos
 
@@ -33,7 +170,7 @@ Todas salen de una sola función, `build_features(cita, historial, as_of)` en `s
 | `lead_time_days` | Días calendario desde `as_of` hasta la cita. No usa horas, porque la cita no las tiene |
 | `appointment_weekday` | De 0 (lunes) a 4 (viernes). El fin de semana se agrupa con el viernes, porque el único sábado es una sola fecha con 31 citas |
 | `age`, `is_male`, `scholarship`, `hypertension`, `diabetes`, `alcoholism`, `handicap` | Atributos del paciente. `handicap` es un conteo de 0 a 4 |
-| `neighbourhood` | Texto crudo. Se codifica con target encoding suavizado dentro del modelo, ajustado solo con train (Fase 3) |
+| `neighbourhood` | Texto crudo. Se codifica con target encoding suavizado dentro del modelo, ajustado solo con train |
 | `has_history`, `prev_appointments`, `prev_no_shows`, `prev_no_show_rate` | Historial del paciente, contando solo citas con fecha **estrictamente anterior** a `as_of`. Si no hay historial, todo vale 0 y `has_history = 0` |
 
 Se excluyen a propósito:
@@ -54,7 +191,7 @@ Además, se recalculó el historial por fuerza bruta en 2.000 citas reales al az
 
 El split es cronológico por fecha de cita y no aleatorio. El modelo se usará para predecir citas futuras con lo aprendido del pasado, y un split aleatorio mezclaría citas de la misma semana en train y test. Eso infla las métricas con patrones de fechas concretas y deja que el historial de un paciente vea el futuro.
 
-Un mismo paciente puede aparecer en train y en test, porque en producción los pacientes vuelven. Su historial siempre se calcula sin fuga, y las métricas se reportarán por separado para citas con y sin historial.
+Un mismo paciente puede aparecer en train y en test, porque en producción los pacientes vuelven. Su historial siempre se calcula sin fuga, y las métricas se reportan por separado para citas con y sin historial (ver [ADR 0003](docs/adr/0003-split-temporal.md)).
 
 Resultados de `make features` (`reports/split_summary.json`, solo citas con antelación de 1 día o más):
 
@@ -68,7 +205,7 @@ Hay dos cambios de distribución entre splits, y son reales, no errores:
 - **La tasa base baja** de 29,6 % a 26,0 %. Las métricas que dependen de la prevalencia, como PR-AUC, no son comparables entre splits sin tenerlo en cuenta.
 - **La proporción de citas con historial se triplica**, del 13 % al 41 %. Es un efecto de la ventana recortada: el dataset empieza el 2016-04-29, así que las citas tempranas casi nunca tienen historial. El modelo aprende las features de historial con relativamente pocos ejemplos.
 
-## Modelado y resultados (Fase 3)
+## Modelado y resultados
 
 ```bash
 make train   # -> models/<fecha>_<hash>.joblib, models/metadata.json, reports/metrics.json, reports/figures/
@@ -184,7 +321,7 @@ Entre mujeres y hombres las métricas son similares. Por edad y por beca, en cam
 4. **Discriminación modesta** (ROC-AUC 0,60) y beneficio económico casi nulo bajo los supuestos de costo.
 5. **Test ya no está limpio para el modelo principal.** Se miró después de elegir el modelo (ADR 0001) y otra vez después de aplicar `log1p` (ADR 0002).
 
-## Simulador (Fase 4)
+## Simulador
 
 Recibe una cita hipotética y devuelve la probabilidad calibrada de no-show, el nivel de riesgo y los 3 factores SHAP principales. No agenda nada ni modifica el dataset. Necesita `make data`, `make features` y `make train`.
 
@@ -247,12 +384,12 @@ Reglas:
 
 `tests/test_parity_real.py` repite la verificación sobre una muestra cuando existen los datos. En CI corre la versión sintética, `tests/test_simulator.py`.
 
-## Registro de simulaciones y CI (Fase 5)
+## Registro de simulaciones y CI
 
 Cada `simulate` se guarda en `data/simulations.db` (SQLite, ignorado por git), en la tabla `simulations`:
-- Columnas: fecha de creación, paciente, `as_of`, fecha y hora de la cita, antelación, estado, probabilidad, nivel de riesgo, acción (se llena en la Fase 7), versión del modelo, features y `simulated`.
+- Columnas: fecha de creación, paciente, `as_of`, fecha y hora de la cita, antelación, estado, probabilidad, nivel de riesgo, acción, versión del modelo, features y `simulated`.
 - **Lo simulado no se mezcla con lo real.** Un `CHECK (simulated = 1)` impide insertar filas no simuladas, y el historial real solo se lee del dataset.
-- **Datos mínimos.** De un paciente existente se guarda su `PatientId`. De un paciente nuevo, solo un hash de sus datos declarados (`nuevo:<sha256[:16]>`) y las features usadas. Las features se guardan porque la Fase 6 las necesita para medir drift.
+- **Datos mínimos.** De un paciente existente se guarda su `PatientId`. De un paciente nuevo, solo un hash de sus datos declarados (`nuevo:<sha256[:16]>`) y las features usadas. Las features se guardan porque el monitoreo de drift las necesita.
 - Todas las consultas son parametrizadas.
 
 ```bash
@@ -271,7 +408,7 @@ make model-info                                           # versión, umbrales, 
 
 **CI** (`.github/workflows/ci.yml`) corre `make lint`, `make test` y `make smoke`. `make smoke` ejecuta el pipeline completo con datos sintéticos (`noshow_guard.synthetic`) en un directorio temporal: datos, features, split, entrenamiento, guardado, simulación y registro. No depende del CSV de Kaggle ni toca `models/` ni `reports/`. Los tests que necesitan los datos reales se omiten en CI.
 
-## Monitoreo de drift (Fase 6)
+## Monitoreo de drift
 
 ```bash
 make monitor   # python -m noshow_guard.drift report -> reports/drift_report.md
@@ -297,12 +434,12 @@ El test real también da «reentrenar», y lo explica la ventana recortada del d
 
 Las señales, el procedimiento de reentrenamiento y la validación campeón/retador antes de reemplazar el modelo están en [docs/retraining_plan.md](docs/retraining_plan.md).
 
-## Acciones, mensajes simulados e impacto (Fase 7)
+## Acciones, mensajes simulados e impacto
 
 ### Acción y mensaje
 
 `simulate` ahora devuelve `action` y `message_preview`.
-- **Acción.** `actions.decide_action(p, umbrales)` es una función pura que lee los umbrales de `models/metadata.json` (0,36 para el estándar y 0,67 para el reforzado). Usa la misma regla que se evaluó en la Fase 3.
+- **Acción.** `actions.decide_action(p, umbrales)` es una función pura que lee los umbrales de `models/metadata.json` (0,36 para el estándar y 0,67 para el reforzado). Usa la misma regla con la que se evaluaron los umbrales.
 - **Envío.** Si la acción no es `sin_accion`, el mensaje pasa por `MessageSender`. Su única implementación es `MockSender`, que lo guarda en memoria y lo muestra por stderr como `[MockSender] mensaje simulado, NO enviado: ...`. **No hay código de red**, y un test lo verifica bloqueando `socket`.
 - **Plantillas.** Están en `src/noshow_guard/templates/messages.json` y solo pueden usar `{fecha}` y `{hora}`; un test lo verifica. La fecha se escribe en español sin depender del locale del sistema.
 - **Registro.** La columna `action` del registro SQLite ahora se llena.
@@ -344,7 +481,7 @@ make impact   # -> reports/impact.md, reports/impact.json, reports/figures/impac
 
 > **Esto es una simulación, no un resultado real.** Los efectos de los recordatorios son supuestos configurables (`ImpactConfig`) y no se estimaron con datos. Como referencia no causal: en el EDA, dentro de cada tramo de antelación, las citas con SMS tuvieron entre 10 % y 25 % menos no-show relativo.
 
-Se usaron las 17.344 citas de test, con su resultado observado (4.509 no-shows), y los costos de la Fase 3 (hueco 20, estándar 1, reforzado 3). Hay cuatro políticas: no hacer nada, recordar a todos, **según el modelo** con los umbrales desplegados (fijos en 0,36 / 0,67) y **según el modelo ajustado**. En esta última los umbrales se re-optimizan **en validación** con los supuestos de cada escenario y luego se evalúan en test; test nunca participa en elegirlos.
+Se usaron las 17.344 citas de test, con su resultado observado (4.509 no-shows), y los costos supuestos (hueco 20, estándar 1, reforzado 3). Hay cuatro políticas: no hacer nada, recordar a todos, **según el modelo** con los umbrales desplegados (fijos en 0,36 / 0,67) y **según el modelo ajustado**. En esta última los umbrales se re-optimizan **en validación** con los supuestos de cada escenario y luego se evalúan en test; test nunca participa en elegirlos.
 
 | Escenario (efecto estándar / reforzado) | Política | Umbrales | Recordatorios | No-shows evitados (esperados) | Evitados por 100 recordatorios | Ahorro vs no hacer nada |
 |---|---|---|---|---|---|---|
@@ -368,3 +505,4 @@ Lectura honesta:
 - **Con los umbrales fijos, el modelo solo gana en el escenario base**, y ahí el ahorro es pequeño: 176 unidades, un 0,2 % del costo de no hacer nada.
 - **El modelo focaliza mejor que recordar a todos:** 5,6 no-shows evitados por cada 100 recordatorios en el escenario base, contra 3,9.
 - **La conclusión depende sobre todo del efecto real del recordatorio**, que nadie midió. El modelo aporta la priorización. El umbral correcto solo se puede fijar después de medir ese efecto, idealmente con un experimento aleatorizado.
+
