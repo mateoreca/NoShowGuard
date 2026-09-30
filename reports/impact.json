@@ -1,0 +1,168 @@
+{
+  "es_simulacion": true,
+  "supuestos": [
+    {
+      "name": "pesimista",
+      "standard_effect": 0.05,
+      "reinforced_effect": 0.1
+    },
+    {
+      "name": "base",
+      "standard_effect": 0.15,
+      "reinforced_effect": 0.3
+    },
+    {
+      "name": "optimista",
+      "standard_effect": 0.25,
+      "reinforced_effect": 0.45
+    }
+  ],
+  "costos": {
+    "no_show_cost": 20.0,
+    "standard_cost": 1.0,
+    "reinforced_cost": 3.0,
+    "standard_effect": 0.15,
+    "reinforced_effect": 0.3
+  },
+  "umbrales": {
+    "standard": 0.36,
+    "reinforced": 0.67
+  },
+  "resultados": [
+    {
+      "escenario": "pesimista",
+      "efecto_estandar": 0.05,
+      "efecto_reforzado": 0.1,
+      "politica": "no_hacer_nada",
+      "no_shows_sin_accion": 4509.0,
+      "no_shows_evitados": 0.0,
+      "recordatorios_estandar": 0,
+      "recordatorios_reforzados": 0,
+      "costo_total": 90180.0,
+      "recordatorios": 0,
+      "evitados_por_100_recordatorios": 0.0,
+      "ahorro_vs_nada": 0.0,
+      "ahorro_por_cita": 0.0
+    },
+    {
+      "escenario": "pesimista",
+      "efecto_estandar": 0.05,
+      "efecto_reforzado": 0.1,
+      "politica": "recordar_a_todos",
+      "no_shows_sin_accion": 4509.0,
+      "no_shows_evitados": 225.45000000000002,
+      "recordatorios_estandar": 17344,
+      "recordatorios_reforzados": 0,
+      "costo_total": 103015.0,
+      "recordatorios": 17344,
+      "evitados_por_100_recordatorios": 1.2998731549815499,
+      "ahorro_vs_nada": -12835.0,
+      "ahorro_por_cita": -0.7400253690036901
+    },
+    {
+      "escenario": "pesimista",
+      "efecto_estandar": 0.05,
+      "efecto_reforzado": 0.1,
+      "politica": "segun_modelo",
+      "no_shows_sin_accion": 4509.0,
+      "no_shows_evitados": 26.6,
+      "recordatorios_estandar": 1420,
+      "recordatorios_reforzados": 0,
+      "costo_total": 91068.0,
+      "recordatorios": 1420,
+      "evitados_por_100_recordatorios": 1.8732394366197183,
+      "ahorro_vs_nada": -888.0,
+      "ahorro_por_cita": -0.05119926199261993
+    },
+    {
+      "escenario": "base",
+      "efecto_estandar": 0.15,
+      "efecto_reforzado": 0.3,
+      "politica": "no_hacer_nada",
+      "no_shows_sin_accion": 4509.0,
+      "no_shows_evitados": 0.0,
+      "recordatorios_estandar": 0,
+      "recordatorios_reforzados": 0,
+      "costo_total": 90180.0,
+      "recordatorios": 0,
+      "evitados_por_100_recordatorios": 0.0,
+      "ahorro_vs_nada": 0.0,
+      "ahorro_por_cita": 0.0
+    },
+    {
+      "escenario": "base",
+      "efecto_estandar": 0.15,
+      "efecto_reforzado": 0.3,
+      "politica": "recordar_a_todos",
+      "no_shows_sin_accion": 4509.0,
+      "no_shows_evitados": 676.3499999999999,
+      "recordatorios_estandar": 17344,
+      "recordatorios_reforzados": 0,
+      "costo_total": 93997.0,
+      "recordatorios": 17344,
+      "evitados_por_100_recordatorios": 3.8996194649446485,
+      "ahorro_vs_nada": -3817.0,
+      "ahorro_por_cita": -0.2200761070110701
+    },
+    {
+      "escenario": "base",
+      "efecto_estandar": 0.15,
+      "efecto_reforzado": 0.3,
+      "politica": "segun_modelo",
+      "no_shows_sin_accion": 4509.0,
+      "no_shows_evitados": 79.79999999999998,
+      "recordatorios_estandar": 1420,
+      "recordatorios_reforzados": 0,
+      "costo_total": 90004.0,
+      "recordatorios": 1420,
+      "evitados_por_100_recordatorios": 5.619718309859153,
+      "ahorro_vs_nada": 176.0,
+      "ahorro_por_cita": 0.01014760147601476
+    },
+    {
+      "escenario": "optimista",
+      "efecto_estandar": 0.25,
+      "efecto_reforzado": 0.45,
+      "politica": "no_hacer_nada",
+      "no_shows_sin_accion": 4509.0,
+      "no_shows_evitados": 0.0,
+      "recordatorios_estandar": 0,
+      "recordatorios_reforzados": 0,
+      "costo_total": 90180.0,
+      "recordatorios": 0,
+      "evitados_por_100_recordatorios": 0.0,
+      "ahorro_vs_nada": 0.0,
+      "ahorro_por_cita": 0.0
+    },
+    {
+      "escenario": "optimista",
+      "efecto_estandar": 0.25,
+      "efecto_reforzado": 0.45,
+      "politica": "recordar_a_todos",
+      "no_shows_sin_accion": 4509.0,
+      "no_shows_evitados": 1127.25,
+      "recordatorios_estandar": 17344,
+      "recordatorios_reforzados": 0,
+      "costo_total": 84979.0,
+      "recordatorios": 17344,
+      "evitados_por_100_recordatorios": 6.499365774907749,
+      "ahorro_vs_nada": 5201.0,
+      "ahorro_por_cita": 0.2998731549815498
+    },
+    {
+      "escenario": "optimista",
+      "efecto_estandar": 0.25,
+      "efecto_reforzado": 0.45,
+      "politica": "segun_modelo",
+      "no_shows_sin_accion": 4509.0,
+      "no_shows_evitados": 133.0,
+      "recordatorios_estandar": 1420,
+      "recordatorios_reforzados": 0,
+      "costo_total": 88940.0,
+      "recordatorios": 1420,
+      "evitados_por_100_recordatorios": 9.366197183098592,
+      "ahorro_vs_nada": 1240.0,
+      "ahorro_por_cita": 0.07149446494464945
+    }
+  ]
+}

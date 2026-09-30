@@ -1,6 +1,6 @@
 # Reporte de drift
 
-- Generado: 2026-09-30 00:19 UTC
+- Generado: 2026-09-30 00:38 UTC
 - Modelo: `20260929_c823f970`
 - Referencia: features de **train** (43.937 citas) y su probabilidad predicha
 - PSI < 0,10 estable · 0,10 a 0,25 vigilar · > 0,25 alerta

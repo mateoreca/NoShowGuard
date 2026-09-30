@@ -2,7 +2,7 @@
 
 Simulador local de agendamiento: dado un paciente, una fecha y una hora, estima la probabilidad calibrada de inasistencia (no-show), recomienda una acción de recordatorio y explica el caso. Nada se agenda de verdad y nada sale de la máquina.
 
-> Estado: Fase 6 (monitoreo de drift). El README completo se construye en la Fase 8.
+> Estado: Fase 7 (acciones, mensajes simulados e impacto). El README completo se construye en la Fase 8.
 
 ## Requisitos
 
@@ -296,3 +296,71 @@ El drift inducido se detecta y el control sale estable, que es lo que pedía el 
 El test real también da «reentrenar», y lo explica la ventana recortada del dataset, no un cambio de comportamiento: las citas de junio tienen más historial disponible que las de mayo. La probabilidad predicha casi no cambia (PSI 0,009).
 
 Las señales, el procedimiento de reentrenamiento y la validación campeón/retador antes de reemplazar el modelo están en [docs/retraining_plan.md](docs/retraining_plan.md).
+
+## Acciones, mensajes simulados e impacto (Fase 7)
+
+### Acción y mensaje
+
+`simulate` ahora devuelve `action` y `message_preview`.
+- **Acción.** `actions.decide_action(p, umbrales)` es una función pura que lee los umbrales de `models/metadata.json` (0,36 para el estándar y 0,67 para el reforzado). Usa la misma regla que se evaluó en la Fase 3.
+- **Envío.** Si la acción no es `sin_accion`, el mensaje pasa por `MessageSender`. Su única implementación es `MockSender`, que lo guarda en memoria y lo muestra por stderr como `[MockSender] mensaje simulado, NO enviado: ...`. **No hay código de red**, y un test lo verifica bloqueando `socket`.
+- **Plantillas.** Están en `src/noshow_guard/templates/messages.json` y solo pueden usar `{fecha}` y `{hora}`; un test lo verifica. La fecha se escribe en español sin depender del locale del sistema.
+- **Registro.** La columna `action` del registro SQLite ahora se llena.
+
+```bash
+uv run python -m noshow_guard.cli simulate --age 20 --gender M --neighbourhood "itararé" --scholarship \
+    --alcoholism --date 2016-07-04 --time 10:00 --as-of 2016-06-01 --no-log
+# stderr: [MockSender] mensaje simulado, NO enviado: Hola. Te recordamos tu cita del lunes 4 de julio de 2016 a las 10:00. ...
+# stdout: "probability_no_show": 0.5422, "risk_level": "alto", "action": "recordatorio_estandar", ...
+```
+
+### ¿Y si...?
+
+`what_if(request, lead_times=[1, 3, 7, 14])` repite la misma cita moviendo `as_of` hacia atrás. No registra ni envía nada.
+
+```bash
+uv run python -m noshow_guard.cli what-if --age 24 --gender F --neighbourhood "jardim da penha" --scholarship \
+    --date 2016-06-14 --time 08:30 --lead-times 1 3 7 14 30 60 --plot reports/figures/what_if_example.png
+```
+
+| Antelación | Probabilidad | Riesgo | Acción |
+|---|---|---|---|
+| 1 | 0,262 | bajo | sin_accion |
+| 3 | 0,275 | bajo | sin_accion |
+| 7 | 0,299 | medio | sin_accion |
+| 14 | 0,344 | medio | sin_accion |
+| 30 | 0,349 | medio | sin_accion |
+| 60 | 0,361 | medio | recordatorio_estandar |
+
+![What-if](reports/figures/what_if_example.png)
+
+La tabla muestra **la asociación que aprendió el modelo, no un efecto causal**. Agendar con menos antelación no garantiza que baje la inasistencia. En un paciente existente, mover `as_of` también cambia su historial disponible.
+
+### Simulación de impacto
+
+```bash
+make impact   # -> reports/impact.md, reports/impact.json, reports/figures/impact.png
+```
+
+> **Esto es una simulación, no un resultado real.** Los efectos de los recordatorios son supuestos configurables (`ImpactConfig`) y no se estimaron con datos. Como referencia no causal: en el EDA, dentro de cada tramo de antelación, las citas con SMS tuvieron entre 10 % y 25 % menos no-show relativo.
+
+Se usaron las 17.344 citas de test, con su resultado observado (4.509 no-shows), y los costos de la Fase 3 (hueco 20, estándar 1, reforzado 3). Los umbrales del modelo quedan fijos en los desplegados.
+
+| Escenario (efecto estándar / reforzado) | Política | Recordatorios | No-shows evitados (esperados) | Evitados por 100 recordatorios | Ahorro vs no hacer nada |
+|---|---|---|---|---|---|
+| Pesimista (5 % / 10 %) | Recordar a todos | 17.344 | 225,5 | 1,3 | −12.835 |
+| | Según el modelo | 1.420 | 26,6 | 1,9 | −888 |
+| Base (15 % / 30 %) | Recordar a todos | 17.344 | 676,3 | 3,9 | −3.817 |
+| | Según el modelo | 1.420 | 79,8 | 5,6 | **+176** |
+| Optimista (25 % / 45 %) | Recordar a todos | 17.344 | 1.127,2 | 6,5 | **+5.201** |
+| | Según el modelo | 1.420 | 133,0 | 9,4 | +1.240 |
+
+![Impacto](reports/figures/impact.png)
+
+Lectura honesta:
+- **El modelo focaliza mejor.** Por cada 100 recordatorios evita un 44 % más de no-shows que recordar a todos (5,6 contra 3,9 en el escenario base), porque su precisión es de 0,375 contra una prevalencia de 0,26.
+- **El modelo solo gana en el escenario base**, que es para el que se eligieron sus umbrales, y ahí el ahorro es pequeño: 176 unidades, un 0,2 % del costo de no hacer nada.
+- **Si el recordatorio fuera más efectivo** (escenario optimista), recordar a todos sería mejor que la política del modelo con los umbrales actuales. Con un efecto del 25 %, el umbral óptimo bajaría a 1 / (20 × 0,25) = 0,20.
+- **Si fuera menos efectivo** (escenario pesimista), recordar pierde dinero con cualquier política.
+- **El recordatorio reforzado no se activa en test**, porque ninguna probabilidad llega a 0,67.
+- **La conclusión depende más de los supuestos que del modelo.** Antes de desplegar, lo más valioso sería medir el efecto real del recordatorio con un experimento aleatorizado, y después fijar los umbrales.
