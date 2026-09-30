@@ -17,6 +17,7 @@ dependencies = [
     "scipy==1.16.2",
     "seaborn==0.13.2",
     "shap==0.48.0",
+    "streamlit==1.50.0",
 ]
 
 [dependency-groups]

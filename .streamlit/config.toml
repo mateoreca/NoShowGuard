@@ -1,0 +1,9 @@
+# La app es local: solo escucha en esta máquina y no envía telemetría a Streamlit.
+[server]
+address = "localhost"
+port = 8501
+headless = true
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
