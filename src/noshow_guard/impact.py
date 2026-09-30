@@ -1,15 +1,15 @@
 """Simulación de impacto de políticas de recordatorio. ES UNA SIMULACIÓN, NO UN RESULTADO REAL.
 
 Sobre las citas de test (resultado observado ``y`` y probabilidad calibrada del modelo) se
-comparan tres políticas bajo supuestos explícitos del efecto de cada recordatorio:
+comparan políticas bajo supuestos explícitos del efecto de cada recordatorio:
 
 - no hacer nada,
 - recordatorio estándar a todos,
-- según el modelo (umbrales por costo guardados en ``metadata.json``).
+- según el modelo, con los umbrales desplegados (``metadata.json``), fijos en todo escenario,
+- según el modelo con umbrales re-optimizados en validación para cada escenario.
 
 Para una cita con resultado ``y`` y una acción con efecto supuesto ``e``, los no-shows
 evitados esperados son ``y * e`` y el costo es ``costo_acción + costo_hueco * y * (1 - e)``.
-Los umbrales del modelo quedan fijos (los desplegados); solo cambian los supuestos.
 
 Uso: ``python -m noshow_guard.impact`` (o ``make impact``).
 """
@@ -24,11 +24,16 @@ import pandas as pd
 
 from noshow_guard.actions import thresholds_from_metadata
 from noshow_guard.config import IMPACT, PATHS, CostConfig, ImpactConfig, Paths
-from noshow_guard.evaluation import Thresholds, action_costs, assign_actions
+from noshow_guard.evaluation import Thresholds, action_costs, assign_actions, optimize_thresholds
 from noshow_guard.formatting import es_number
 from noshow_guard.model import load_model
 
-POLICIES: tuple[str, ...] = ("no_hacer_nada", "recordar_a_todos", "segun_modelo")
+POLICIES: tuple[str, ...] = (
+    "no_hacer_nada",
+    "recordar_a_todos",
+    "segun_modelo",
+    "segun_modelo_ajustado",
+)
 BANNER = (
     "> **SIMULACIÓN, NO RESULTADO REAL.** Los efectos de los recordatorios son supuestos "
     "configurables (`ImpactConfig` en `config.py`); no se estimaron con datos. Las cifras "
@@ -36,14 +41,22 @@ BANNER = (
 )
 
 
-def policy_actions(p: np.ndarray, thresholds: Thresholds) -> dict[str, np.ndarray]:
-    """Acción por cita (0 nada, 1 estándar, 2 reforzado) para cada política."""
+def policy_actions(
+    p: np.ndarray, thresholds: Thresholds, adjusted: Thresholds | None = None
+) -> dict[str, np.ndarray]:
+    """Acción por cita (0 nada, 1 estándar, 2 reforzado) para cada política.
+
+    ``adjusted`` son umbrales re-optimizados en validación para el escenario evaluado.
+    """
     n = len(p)
-    return {
+    actions = {
         "no_hacer_nada": np.zeros(n, dtype=int),
         "recordar_a_todos": np.ones(n, dtype=int),
         "segun_modelo": assign_actions(p, thresholds),
     }
+    if adjusted is not None:
+        actions["segun_modelo_ajustado"] = assign_actions(p, adjusted)
+    return actions
 
 
 def evaluate_policy(actions: np.ndarray, y: np.ndarray, costs: CostConfig) -> dict[str, float]:
@@ -64,8 +77,14 @@ def impact_table(
     thresholds: Thresholds,
     base_costs: CostConfig,
     impact: ImpactConfig = IMPACT,
+    validation: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> pd.DataFrame:
-    """Una fila por escenario y política, con el ahorro frente a no hacer nada."""
+    """Una fila por escenario y política, con el ahorro frente a no hacer nada.
+
+    Si se pasa ``validation`` (probabilidades y resultados de validación), agrega la política
+    ``segun_modelo_ajustado``: umbrales re-optimizados en validación con los supuestos de
+    cada escenario y evaluados en test. Test nunca participa en elegir umbrales.
+    """
     rows = []
     for scenario in impact.scenarios:
         costs = replace(
@@ -73,19 +92,25 @@ def impact_table(
             standard_effect=scenario.standard_effect,
             reinforced_effect=scenario.reinforced_effect,
         )
+        adjusted = optimize_thresholds(*validation, costs)[0] if validation is not None else None
+        used = {"segun_modelo": thresholds, "segun_modelo_ajustado": adjusted}
         results = {
-            name: evaluate_policy(a, y, costs) for name, a in policy_actions(p, thresholds).items()
+            name: evaluate_policy(actions, y, costs)
+            for name, actions in policy_actions(p, thresholds, adjusted).items()
         }
         baseline = results["no_hacer_nada"]["costo_total"]
-        for name in POLICIES:
+        for name in [policy for policy in POLICIES if policy in results]:
             r = results[name]
             reminders = r["recordatorios_estandar"] + r["recordatorios_reforzados"]
+            th = used.get(name)
             rows.append(
                 {
                     "escenario": scenario.name,
                     "efecto_estandar": scenario.standard_effect,
                     "efecto_reforzado": scenario.reinforced_effect,
                     "politica": name,
+                    "umbral_estandar": th.standard if th else None,
+                    "umbral_reforzado": th.reinforced if th else None,
                     **r,
                     "recordatorios": reminders,
                     "evitados_por_100_recordatorios": (
@@ -134,13 +159,26 @@ def render_markdown(
         "",
         "## Resultados",
         "",
-        "| Escenario | Política | Recordatorios | No-shows evitados (esperados) | "
-        "Evitados por 100 recordatorios | Costo total | Ahorro vs no hacer nada |",
-        "|---|---|---|---|---|---|---|",
+        "- `segun_modelo`: umbrales desplegados, fijos en todos los escenarios.",
+        "- `segun_modelo_ajustado`: umbrales re-optimizados **en validación** con los supuestos "
+        "de cada escenario, evaluados en test. Responde si el modelo aporta cuando los umbrales "
+        "se adaptan al efecto supuesto.",
+        "",
+        "| Escenario | Política | Umbrales (estándar / reforzado) | Recordatorios | "
+        "No-shows evitados (esperados) | Evitados por 100 recordatorios | Costo total | "
+        "Ahorro vs no hacer nada |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for r in table.to_dict("records"):
+        th = "-"
+        if pd.notna(r["umbral_estandar"]):
+            th = (
+                f"{es_number(float(r['umbral_estandar']), 2)} / "
+                f"{es_number(float(r['umbral_reforzado']), 2)}"
+            )
         lines.append(
-            f"| {r['escenario']} | {r['politica']} | {es_number(float(r['recordatorios']), 0)} | "
+            f"| {r['escenario']} | {r['politica']} | {th} | "
+            f"{es_number(float(r['recordatorios']), 0)} | "
             f"{es_number(float(r['no_shows_evitados']), 1)} de "
             f"{es_number(float(r['no_shows_sin_accion']), 0)} | "
             f"{es_number(float(r['evitados_por_100_recordatorios']), 1)} | "
@@ -159,8 +197,9 @@ def plot_impact(table: pd.DataFrame, paths: Paths) -> None:
     import matplotlib.pyplot as plt
 
     pivot = table.pivot(index="escenario", columns="politica", values="ahorro_vs_nada")
-    pivot = pivot.loc[[s.name for s in IMPACT.scenarios if s.name in pivot.index], list(POLICIES)]
-    fig, ax = plt.subplots(figsize=(7, 4))
+    order = [s.name for s in IMPACT.scenarios if s.name in pivot.index]
+    pivot = pivot.loc[order, [p for p in POLICIES if p in pivot.columns]]
+    fig, ax = plt.subplots(figsize=(8, 4))
     pivot.plot(kind="bar", ax=ax, rot=0)
     ax.axhline(0, color="black", lw=0.8)
     ax.set(
@@ -178,12 +217,14 @@ def plot_impact(table: pd.DataFrame, paths: Paths) -> None:
 def main(paths: Paths = PATHS) -> int:
     model, metadata = load_model(paths.model_metadata)
     test = pd.read_parquet(paths.features_dir / "test.parquet")
+    val = pd.read_parquet(paths.features_dir / "val.parquet")
     p = model.predict_proba(test)
     y = test["no_show"].to_numpy()
     thresholds = thresholds_from_metadata(metadata)
     costs = CostConfig(**metadata["costs"])
 
-    table = impact_table(p, y, thresholds, costs)
+    validation = (model.predict_proba(val), val["no_show"].to_numpy())
+    table = impact_table(p, y, thresholds, costs, validation=validation)
     paths.reports.mkdir(parents=True, exist_ok=True)
     paths.impact_report.write_text(
         render_markdown(table, thresholds, costs, len(y), metadata["model_version"]),
@@ -196,7 +237,8 @@ def main(paths: Paths = PATHS) -> int:
                 "supuestos": [asdict(s) for s in IMPACT.scenarios],
                 "costos": asdict(costs),
                 "umbrales": thresholds.to_dict(),
-                "resultados": table.to_dict("records"),
+                # NaN no es JSON válido: los umbrales vacíos se guardan como null.
+                "resultados": table.astype(object).where(table.notna(), None).to_dict("records"),
             },
             indent=2,
             ensure_ascii=False,

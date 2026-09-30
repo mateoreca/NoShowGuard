@@ -252,6 +252,21 @@ def test_model_policy_with_unreachable_thresholds_equals_nothing() -> None:
     assert (model["recordatorios"] == 0).all() and (model["ahorro_vs_nada"] == 0).all()
 
 
+def test_adjusted_thresholds_are_chosen_on_validation_only() -> None:
+    rng = np.random.default_rng(1)
+    p_val = rng.uniform(0, 1, 20_000)
+    y_val = rng.binomial(1, p_val)  # calibradas: el óptimo en val es el analítico
+    impact = ImpactConfig(scenarios=(ImpactScenario("alto", 0.25, 0.45),))
+    table = impact_table(P, Y, TH, COSTS, impact, validation=(p_val, y_val))
+    adjusted = table[table["politica"] == "segun_modelo_ajustado"].iloc[0]
+    # Con efecto 25 %: estándar conviene si p > 1 / (20 * 0,25) = 0,20.
+    assert adjusted["umbral_estandar"] == pytest.approx(0.20, abs=0.03)
+    fixed = table[table["politica"] == "segun_modelo"].iloc[0]
+    assert fixed["umbral_estandar"] == TH.standard
+    # Sin datos de validación, la política ajustada no aparece.
+    assert "segun_modelo_ajustado" not in set(impact_table(P, Y, TH, COSTS, impact)["politica"])
+
+
 def test_impact_report_is_labeled_as_simulation() -> None:
     text = render_markdown(impact_table(P, Y, TH, COSTS), TH, COSTS, len(Y), "v")
     assert "SIMULACIÓN, NO RESULTADO REAL" in text
