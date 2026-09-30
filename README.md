@@ -344,23 +344,27 @@ make impact   # -> reports/impact.md, reports/impact.json, reports/figures/impac
 
 > **Esto es una simulación, no un resultado real.** Los efectos de los recordatorios son supuestos configurables (`ImpactConfig`) y no se estimaron con datos. Como referencia no causal: en el EDA, dentro de cada tramo de antelación, las citas con SMS tuvieron entre 10 % y 25 % menos no-show relativo.
 
-Se usaron las 17.344 citas de test, con su resultado observado (4.509 no-shows), y los costos de la Fase 3 (hueco 20, estándar 1, reforzado 3). Los umbrales del modelo quedan fijos en los desplegados.
+Se usaron las 17.344 citas de test, con su resultado observado (4.509 no-shows), y los costos de la Fase 3 (hueco 20, estándar 1, reforzado 3). Hay cuatro políticas: no hacer nada, recordar a todos, **según el modelo** con los umbrales desplegados (fijos en 0,36 / 0,67) y **según el modelo ajustado**. En esta última los umbrales se re-optimizan **en validación** con los supuestos de cada escenario y luego se evalúan en test; test nunca participa en elegirlos.
 
-| Escenario (efecto estándar / reforzado) | Política | Recordatorios | No-shows evitados (esperados) | Evitados por 100 recordatorios | Ahorro vs no hacer nada |
-|---|---|---|---|---|---|
-| Pesimista (5 % / 10 %) | Recordar a todos | 17.344 | 225,5 | 1,3 | −12.835 |
-| | Según el modelo | 1.420 | 26,6 | 1,9 | −888 |
-| Base (15 % / 30 %) | Recordar a todos | 17.344 | 676,3 | 3,9 | −3.817 |
-| | Según el modelo | 1.420 | 79,8 | 5,6 | **+176** |
-| Optimista (25 % / 45 %) | Recordar a todos | 17.344 | 1.127,2 | 6,5 | **+5.201** |
-| | Según el modelo | 1.420 | 133,0 | 9,4 | +1.240 |
+| Escenario (efecto estándar / reforzado) | Política | Umbrales | Recordatorios | No-shows evitados (esperados) | Evitados por 100 recordatorios | Ahorro vs no hacer nada |
+|---|---|---|---|---|---|---|
+| Pesimista (5 % / 10 %) | Recordar a todos | - | 17.344 | 225,5 | 1,3 | −12.835 |
+| | Modelo, umbrales fijos | 0,36 / 0,67 | 1.420 | 26,6 | 1,9 | −888 |
+| | Modelo, umbrales ajustados | 1,00 / 1,00 | 0 | 0 | - | **0** |
+| Base (15 % / 30 %) | Recordar a todos | - | 17.344 | 676,3 | 3,9 | −3.817 |
+| | Modelo, umbrales fijos | 0,36 / 0,67 | 1.420 | 79,8 | 5,6 | **+176** |
+| | Modelo, umbrales ajustados | 0,36 / 0,67 | 1.420 | 79,8 | 5,6 | **+176** |
+| Optimista (25 % / 45 %) | Recordar a todos | - | 17.344 | 1.127,2 | 6,5 | +5.201 |
+| | Modelo, umbrales fijos | 0,36 / 0,67 | 1.420 | 133,0 | 9,4 | +1.240 |
+| | Modelo, umbrales ajustados | 0,19 / 0,45 | 15.167 (61 reforzados) | 1.041,8 | 6,9 | **+5.548** |
 
 ![Impacto](reports/figures/impact.png)
 
 Lectura honesta:
-- **El modelo focaliza mejor.** Por cada 100 recordatorios evita un 44 % más de no-shows que recordar a todos (5,6 contra 3,9 en el escenario base), porque su precisión es de 0,375 contra una prevalencia de 0,26.
-- **El modelo solo gana en el escenario base**, que es para el que se eligieron sus umbrales, y ahí el ahorro es pequeño: 176 unidades, un 0,2 % del costo de no hacer nada.
-- **Si el recordatorio fuera más efectivo** (escenario optimista), recordar a todos sería mejor que la política del modelo con los umbrales actuales. Con un efecto del 25 %, el umbral óptimo bajaría a 1 / (20 × 0,25) = 0,20.
-- **Si fuera menos efectivo** (escenario pesimista), recordar pierde dinero con cualquier política.
-- **El recordatorio reforzado no se activa en test**, porque ninguna probabilidad llega a 0,67.
-- **La conclusión depende más de los supuestos que del modelo.** Antes de desplegar, lo más valioso sería medir el efecto real del recordatorio con un experimento aleatorizado, y después fijar los umbrales.
+- **Con umbrales ajustados al supuesto, el modelo iguala o supera a las alternativas en los tres escenarios.**
+  - En el pesimista, la decisión óptima es no recordar a nadie. Con un efecto del 5 % el umbral analítico es 1 / (20 × 0,05) = 1,0.
+  - En el base, coincide con la política desplegada.
+  - En el optimista, supera a recordar a todos (+5.548 contra +5.201) enviando 2.177 recordatorios menos. Aquí aparece por primera vez el recordatorio reforzado (61 citas).
+- **Con los umbrales fijos, el modelo solo gana en el escenario base**, y ahí el ahorro es pequeño: 176 unidades, un 0,2 % del costo de no hacer nada.
+- **El modelo focaliza mejor que recordar a todos:** 5,6 no-shows evitados por cada 100 recordatorios en el escenario base, contra 3,9.
+- **La conclusión depende sobre todo del efecto real del recordatorio**, que nadie midió. El modelo aporta la priorización. El umbral correcto solo se puede fijar después de medir ese efecto, idealmente con un experimento aleatorizado.

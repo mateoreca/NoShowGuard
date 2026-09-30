@@ -18,16 +18,22 @@ Como referencia no causal: en el EDA, dentro de cada tramo de antelación, las c
 
 ## Resultados
 
-| Escenario | Política | Recordatorios | No-shows evitados (esperados) | Evitados por 100 recordatorios | Costo total | Ahorro vs no hacer nada |
-|---|---|---|---|---|---|---|
-| pesimista | no_hacer_nada | 0 | 0,0 de 4.509 | 0,0 | 90.180 | 0 |
-| pesimista | recordar_a_todos | 17.344 | 225,5 de 4.509 | 1,3 | 103.015 | -12.835 |
-| pesimista | segun_modelo | 1.420 | 26,6 de 4.509 | 1,9 | 91.068 | -888 |
-| base | no_hacer_nada | 0 | 0,0 de 4.509 | 0,0 | 90.180 | 0 |
-| base | recordar_a_todos | 17.344 | 676,3 de 4.509 | 3,9 | 93.997 | -3.817 |
-| base | segun_modelo | 1.420 | 79,8 de 4.509 | 5,6 | 90.004 | 176 |
-| optimista | no_hacer_nada | 0 | 0,0 de 4.509 | 0,0 | 90.180 | 0 |
-| optimista | recordar_a_todos | 17.344 | 1.127,2 de 4.509 | 6,5 | 84.979 | 5.201 |
-| optimista | segun_modelo | 1.420 | 133,0 de 4.509 | 9,4 | 88.940 | 1.240 |
+- `segun_modelo`: umbrales desplegados, fijos en todos los escenarios.
+- `segun_modelo_ajustado`: umbrales re-optimizados **en validación** con los supuestos de cada escenario, evaluados en test. Responde si el modelo aporta cuando los umbrales se adaptan al efecto supuesto.
+
+| Escenario | Política | Umbrales (estándar / reforzado) | Recordatorios | No-shows evitados (esperados) | Evitados por 100 recordatorios | Costo total | Ahorro vs no hacer nada |
+|---|---|---|---|---|---|---|---|
+| pesimista | no_hacer_nada | - | 0 | 0,0 de 4.509 | 0,0 | 90.180 | 0 |
+| pesimista | recordar_a_todos | - | 17.344 | 225,5 de 4.509 | 1,3 | 103.015 | -12.835 |
+| pesimista | segun_modelo | 0,36 / 0,67 | 1.420 | 26,6 de 4.509 | 1,9 | 91.068 | -888 |
+| pesimista | segun_modelo_ajustado | 1,00 / 1,00 | 0 | 0,0 de 4.509 | 0,0 | 90.180 | 0 |
+| base | no_hacer_nada | - | 0 | 0,0 de 4.509 | 0,0 | 90.180 | 0 |
+| base | recordar_a_todos | - | 17.344 | 676,3 de 4.509 | 3,9 | 93.997 | -3.817 |
+| base | segun_modelo | 0,36 / 0,67 | 1.420 | 79,8 de 4.509 | 5,6 | 90.004 | 176 |
+| base | segun_modelo_ajustado | 0,36 / 0,67 | 1.420 | 79,8 de 4.509 | 5,6 | 90.004 | 176 |
+| optimista | no_hacer_nada | - | 0 | 0,0 de 4.509 | 0,0 | 90.180 | 0 |
+| optimista | recordar_a_todos | - | 17.344 | 1.127,2 de 4.509 | 6,5 | 84.979 | 5.201 |
+| optimista | segun_modelo | 0,36 / 0,67 | 1.420 | 133,0 de 4.509 | 9,4 | 88.940 | 1.240 |
+| optimista | segun_modelo_ajustado | 0,19 / 0,45 | 15.167 | 1.041,8 de 4.509 | 6,9 | 84.632 | 5.548 |
 
 ![Impacto simulado](figures/impact.png)
