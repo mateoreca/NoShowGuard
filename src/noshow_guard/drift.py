@@ -25,6 +25,7 @@ from scipy import stats
 
 from noshow_guard.config import DRIFT, PATHS, SEED, DriftConfig, Paths
 from noshow_guard.features import FEATURE_COLUMNS
+from noshow_guard.formatting import es_number
 from noshow_guard.model import NoShowModel, load_model
 from noshow_guard.registry import Registry
 
@@ -105,12 +106,6 @@ def psi_status(psi: float, cfg: DriftConfig = DRIFT) -> Status:
 
 
 # --- Comparación ---------------------------------------------------------------
-
-
-def es_number(value: float, decimals: int = 3) -> str:
-    """Formato numérico en español: punto de miles y coma decimal."""
-    text = f"{value:,.{decimals}f}"
-    return text.replace(",", "_").replace(".", ",").replace("_", ".")
 
 
 def _summary(values: pd.Series, numeric: bool) -> str:

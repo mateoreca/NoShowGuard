@@ -76,8 +76,32 @@ class SimulationResult(BaseModel):
     appointment_date: date
     appointment_time: time
     as_of: date
+    action: str | None = None
+    message_preview: str | None = None
     top_factors: list[Factor] = Field(default_factory=list)
     features: dict[str, FeatureValue] | None = None
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    model_version: str
+
+
+class WhatIfRow(BaseModel):
+    """La misma cita vista con otra antelación."""
+
+    lead_time_days: int
+    as_of: date
+    status: Literal["ok", "fuera_de_alcance", "error"]
+    probability_no_show: float | None = None
+    risk_level: RiskLevel | None = None
+    action: str | None = None
+    detail: str | None = None
+
+
+class WhatIfResult(BaseModel):
+    """Tabla de "¿y si...?" con la advertencia de que no es un efecto causal."""
+
+    appointment_date: date
+    appointment_time: time
+    rows: list[WhatIfRow]
+    notes: list[str]
     model_version: str

@@ -1,0 +1,5 @@
+{
+  "_nota": "Plantillas de mensajes simulados. Solo pueden usar {fecha} y {hora}: nunca nombres, diagnósticos ni otros datos del paciente.",
+  "recordatorio_estandar": "Hola. Te recordamos tu cita del {fecha} a las {hora}. Si no puedes asistir, avísanos para liberar el espacio.",
+  "recordatorio_reforzado_con_confirmacion": "Hola. Tienes una cita el {fecha} a las {hora}. Por favor confírmanos tu asistencia respondiendo SÍ, o responde NO para reprogramarla sin costo."
+}

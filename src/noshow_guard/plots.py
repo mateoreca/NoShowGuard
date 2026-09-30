@@ -72,6 +72,24 @@ def cost_curve(
     _save(fig, path)
 
 
+def what_if_plot(
+    lead_times: list[int], probabilities: list[float], thresholds: Thresholds, path: Path
+) -> None:
+    """Probabilidad calibrada vs antelación para una misma cita, con los umbrales de acción."""
+    fig, ax = plt.subplots(figsize=(6, 3.8))
+    ax.plot(lead_times, probabilities, "o-", label="probabilidad de no-show")
+    ax.axhline(thresholds.standard, color="C1", ls="--", lw=1, label="umbral recordatorio")
+    ax.axhline(thresholds.reinforced, color="C3", ls="--", lw=1, label="umbral reforzado")
+    ax.set(
+        xlabel="Antelación (días)",
+        ylabel="Probabilidad calibrada",
+        ylim=(0, 1),
+        title="¿Y si...? (asociación aprendida, no efecto causal)",
+    )
+    ax.legend(fontsize=8)
+    _save(fig, path)
+
+
 def shap_summary(contributions: pd.DataFrame, features: pd.DataFrame, path_prefix: Path) -> None:
     """Gráficos SHAP globales: barras de |SHAP| medio y beeswarm.
 

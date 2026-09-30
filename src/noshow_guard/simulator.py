@@ -2,7 +2,8 @@
 
 No agenda nada ni escribe en el dataset. Usa ``build_features`` (el mismo pipeline del
 entrenamiento) y el modelo principal indicado en ``models/metadata.json``. Cada simulación
-se guarda, marcada como simulada, en el registro SQLite (salvo ``log=False``).
+decide una acción, "envía" su mensaje con ``MockSender`` (sin red) y se guarda, marcada como
+simulada, en el registro SQLite (salvo ``log=False``).
 
 Paciente existente:
 - Atributos: los del último registro del paciente agendado a más tardar en ``as_of`` (los
@@ -12,12 +13,22 @@ Paciente existente:
 
 from __future__ import annotations
 
+import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import pandas as pd
 
+from noshow_guard.actions import (
+    Message,
+    MessageSender,
+    MockSender,
+    decide_action,
+    render_message,
+    thresholds_from_metadata,
+)
 from noshow_guard.config import MIN_LEAD_DAYS, PATHS, Paths
 from noshow_guard.data import load_clean
 from noshow_guard.evaluation import risk_level
@@ -33,7 +44,14 @@ from noshow_guard.features import (
 )
 from noshow_guard.model import NoShowModel, load_model
 from noshow_guard.registry import Registry
-from noshow_guard.schemas import Factor, NewPatient, SimulationRequest, SimulationResult
+from noshow_guard.schemas import (
+    Factor,
+    NewPatient,
+    SimulationRequest,
+    SimulationResult,
+    WhatIfResult,
+    WhatIfRow,
+)
 
 FIXED_NOTES: tuple[str, ...] = (
     "La hora de la cita no influye en la predicción: el dataset no registra horas de cita.",
@@ -46,6 +64,13 @@ OUT_OF_SCOPE_NOTE = (
     "No se calcula probabilidad ni acción."
 )
 STALE_AGE_DAYS = 365
+DEFAULT_LEAD_TIMES: tuple[int, ...] = (1, 3, 7, 14)
+WHAT_IF_NOTES: tuple[str, ...] = (
+    "Muestra la asociación que aprendió el modelo entre antelación y no-show, NO un efecto "
+    "causal: agendar con menos antelación no garantiza ese cambio en la inasistencia.",
+    "Para un paciente existente, mover as_of también cambia su historial disponible.",
+    "La hora de la cita no influye en la predicción.",
+)
 
 
 class SimulationError(ValueError):
@@ -62,6 +87,7 @@ class Simulator:
     history: dict[str, list[PastAppointment]]
     known_neighbourhoods: frozenset[str]
     registry: Registry | None = None
+    sender: MessageSender | None = None
 
     @classmethod
     def build(
@@ -70,6 +96,7 @@ class Simulator:
         metadata: dict[str, Any],
         records: pd.DataFrame,
         registry: Registry | None = None,
+        sender: MessageSender | None = None,
     ) -> Simulator:
         """Prepara el simulador a partir de un modelo y del dataset limpio."""
         ordered = records.sort_values(["scheduled_at", "appointment_id"]).reset_index(drop=True)
@@ -80,14 +107,19 @@ class Simulator:
             history=history_index(ordered),
             known_neighbourhoods=frozenset(model.known_neighbourhoods()),
             registry=registry,
+            sender=sender,
         )
 
     @classmethod
-    def from_disk(cls, paths: Paths = PATHS) -> Simulator:
+    def from_disk(cls, paths: Paths = PATHS, sender: MessageSender | None = None) -> Simulator:
         """Carga el modelo principal (vía metadata), el dataset limpio y el registro."""
         model, metadata = load_model(paths.model_metadata)
         return cls.build(
-            model, metadata, load_clean(paths.clean_parquet), Registry(paths.registry_db)
+            model,
+            metadata,
+            load_clean(paths.clean_parquet),
+            Registry(paths.registry_db),
+            sender or MockSender(),
         )
 
     # --- Paciente ------------------------------------------------------------
@@ -160,7 +192,7 @@ class Simulator:
     # --- Simulación ----------------------------------------------------------
 
     def evaluate(self, request: SimulationRequest) -> SimulationResult:
-        """Evalúa una cita hipotética sin agendarla ni registrarla.
+        """Evalúa una cita hipotética sin agendarla, registrarla ni enviar mensajes.
 
         El historial sale solo del dataset real: las simulaciones registradas nunca entran.
         """
@@ -189,10 +221,15 @@ class Simulator:
         X = pd.DataFrame([features], columns=list(FEATURE_COLUMNS))
         probability = float(self.model.predict_proba(X)[0])
         factors = top_factors(self.model.contributions(X).iloc[0], X.iloc[0])
+        action = decide_action(probability, thresholds_from_metadata(self.metadata))
         return SimulationResult(
             status="ok",
             probability_no_show=probability,
             risk_level=risk_level(probability, self.metadata["risk_cutoffs"]),
+            action=action,
+            message_preview=render_message(
+                action, request.appointment_date, request.appointment_time
+            ),
             top_factors=[Factor.model_validate(f) for f in factors],
             features=features,
             warnings=warnings + self.extrapolation_warnings(features),
@@ -201,21 +238,71 @@ class Simulator:
         )
 
     def simulate(self, request: SimulationRequest, log: bool = True) -> SimulationResult:
-        """Evalúa la cita y, si hay registro y ``log`` es True, la guarda como simulada."""
+        """Evalúa la cita, "envía" el mensaje con el sender simulado y la registra.
+
+        El registro solo ocurre si hay registro configurado y ``log`` es True.
+        """
         result = self.evaluate(request)
+        if self.sender is not None and result.action and result.message_preview:
+            self.sender.send(
+                Message(
+                    action=result.action,
+                    text=result.message_preview,
+                    appointment_date=result.appointment_date,
+                    appointment_time=result.appointment_time,
+                )
+            )
         if log and self.registry is not None:
             self.registry.log(request, result)
         return result
+
+    def what_if(
+        self, request: SimulationRequest, lead_times: Sequence[int] = DEFAULT_LEAD_TIMES
+    ) -> WhatIfResult:
+        """Repite la misma cita con otras antelaciones, moviendo ``as_of`` hacia atrás.
+
+        No registra ni envía nada. Para un paciente existente, mover ``as_of`` también cambia
+        el historial disponible (hay menos citas terminadas antes).
+        """
+        if any(lead < 0 for lead in lead_times):
+            raise ValueError("Las antelaciones deben ser >= 0.")
+        rows = []
+        for lead in sorted(set(lead_times)):
+            as_of = request.appointment_date - timedelta(days=lead)
+            try:
+                result = self.evaluate(request.model_copy(update={"as_of": as_of}))
+            except SimulationError as exc:
+                rows.append(
+                    WhatIfRow(lead_time_days=lead, as_of=as_of, status="error", detail=str(exc))
+                )
+                continue
+            rows.append(
+                WhatIfRow(
+                    lead_time_days=lead,
+                    as_of=as_of,
+                    status=result.status,
+                    probability_no_show=result.probability_no_show,
+                    risk_level=result.risk_level,
+                    action=result.action,
+                )
+            )
+        return WhatIfResult(
+            appointment_date=request.appointment_date,
+            appointment_time=request.appointment_time,
+            rows=rows,
+            notes=list(WHAT_IF_NOTES),
+            model_version=self.metadata["model_version"],
+        )
 
 
 _DEFAULT: Simulator | None = None
 
 
 def get_simulator() -> Simulator:
-    """Simulador por defecto, cargado desde disco una sola vez."""
+    """Simulador por defecto (modelo, datos y registro en disco; mensajes a stderr)."""
     global _DEFAULT
     if _DEFAULT is None:
-        _DEFAULT = Simulator.from_disk()
+        _DEFAULT = Simulator.from_disk(sender=MockSender(stream=sys.stderr))
     return _DEFAULT
 
 
@@ -224,3 +311,12 @@ def simulate(
 ) -> SimulationResult:
     """Punto de entrada: ``simulate(request) -> SimulationResult``. Registra por defecto."""
     return (simulator or get_simulator()).simulate(request, log)
+
+
+def what_if(
+    request: SimulationRequest,
+    lead_times: Sequence[int] = DEFAULT_LEAD_TIMES,
+    simulator: Simulator | None = None,
+) -> WhatIfResult:
+    """``what_if(request, lead_times=[1, 3, 7, 14])``: antelación -> probabilidad -> acción."""
+    return (simulator or get_simulator()).what_if(request, lead_times)

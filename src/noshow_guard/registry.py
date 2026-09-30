@@ -73,7 +73,6 @@ class Registry:
         self,
         request: SimulationRequest,
         result: SimulationResult,
-        action: str | None = None,
         created_at: datetime | None = None,
     ) -> int:
         """Inserta una simulación y devuelve su id. Consultas siempre parametrizadas."""
@@ -93,7 +92,7 @@ class Registry:
             result.status,
             result.probability_no_show,
             result.risk_level,
-            action,
+            result.action,
             result.model_version,
             json.dumps(result.features, ensure_ascii=False) if result.features else None,
         )
