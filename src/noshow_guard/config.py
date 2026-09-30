@@ -76,6 +76,10 @@ class Paths:
     def drift_report(self) -> Path:
         return self.reports / "drift_report.md"
 
+    @property
+    def impact_report(self) -> Path:
+        return self.reports / "impact.md"
+
 
 @dataclass(frozen=True)
 class DataRules:
@@ -142,6 +146,30 @@ class DriftConfig:
 
 
 @dataclass(frozen=True)
+class ImpactScenario:
+    """Supuesto de efecto de las acciones (reducción relativa del no-show). NO sale de datos."""
+
+    name: str
+    standard_effect: float
+    reinforced_effect: float
+
+
+@dataclass(frozen=True)
+class ImpactConfig:
+    """Escenarios de sensibilidad para la simulación de impacto.
+
+    El escenario base coincide con los efectos de ``CostConfig`` (con los que se eligieron
+    los umbrales). Los costos por acción y por hueco vacío son los de ``CostConfig``.
+    """
+
+    scenarios: tuple[ImpactScenario, ...] = (
+        ImpactScenario("pesimista", standard_effect=0.05, reinforced_effect=0.10),
+        ImpactScenario("base", standard_effect=0.15, reinforced_effect=0.30),
+        ImpactScenario("optimista", standard_effect=0.25, reinforced_effect=0.45),
+    )
+
+
+@dataclass(frozen=True)
 class SearchConfig:
     """Búsqueda aleatoria de hiperparámetros de LightGBM."""
 
@@ -159,6 +187,7 @@ COSTS = CostConfig()
 SEARCH = SearchConfig()
 RISK = RiskConfig()
 DRIFT = DriftConfig()
+IMPACT = ImpactConfig()
 
 # Citas con antelación menor a esto quedan fuera del alcance del modelo (mismo día).
 MIN_LEAD_DAYS: int = 1
