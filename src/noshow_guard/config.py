@@ -72,6 +72,10 @@ class Paths:
     def model_metadata(self) -> Path:
         return self.models / "metadata.json"
 
+    @property
+    def drift_report(self) -> Path:
+        return self.reports / "drift_report.md"
+
 
 @dataclass(frozen=True)
 class DataRules:
@@ -122,6 +126,22 @@ class RiskConfig:
 
 
 @dataclass(frozen=True)
+class DriftConfig:
+    """Umbrales de PSI y parámetros de los lotes de monitoreo.
+
+    PSI < psi_watch: estable; psi_watch a psi_alert: vigilar; > psi_alert: alerta.
+    """
+
+    psi_watch: float = 0.10
+    psi_alert: float = 0.25
+    bins: int = 10
+    min_sample: int = 100  # por debajo no se emite veredicto
+    batch_size: int = 5000
+    # Variables clave: una alerta en cualquiera de ellas sugiere reentrenar.
+    key_variables: tuple[str, ...] = ("lead_time_days", "age", "has_history", "probability")
+
+
+@dataclass(frozen=True)
 class SearchConfig:
     """Búsqueda aleatoria de hiperparámetros de LightGBM."""
 
@@ -138,6 +158,7 @@ SPLIT = SplitConfig()
 COSTS = CostConfig()
 SEARCH = SearchConfig()
 RISK = RiskConfig()
+DRIFT = DriftConfig()
 
 # Citas con antelación menor a esto quedan fuera del alcance del modelo (mismo día).
 MIN_LEAD_DAYS: int = 1

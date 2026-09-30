@@ -1,5 +1,5 @@
 # Comandos del proyecto. Los objetivos de fases futuras se agregan cuando existen.
-.PHONY: setup test lint format data features train smoke model-info eda
+.PHONY: setup test lint format data features train smoke model-info monitor eda
 
 setup:  ## Instala Python 3.11 y dependencias exactas desde uv.lock
 	uv sync --locked
@@ -31,6 +31,9 @@ smoke:  ## Pipeline completo con datos sintéticos en un directorio temporal (no
 
 model-info:  ## Versión y metadata del modelo principal
 	uv run python -m noshow_guard.cli model-info
+
+monitor:  ## Reporte de drift -> reports/drift_report.md
+	uv run python -m noshow_guard.drift report
 
 eda: data  ## Ejecuta el notebook de EDA y guarda sus salidas
 	uv run jupyter nbconvert --to notebook --execute --inplace notebooks/01_eda.ipynb
