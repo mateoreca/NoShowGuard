@@ -2,7 +2,7 @@
 
 Simulador local de agendamiento: dado un paciente, una fecha y una hora, estima la probabilidad calibrada de inasistencia (no-show), recomienda una acción de recordatorio y explica el caso. Nada se agenda de verdad y nada sale de la máquina.
 
-> Estado: Fase 5 (registro de simulaciones y CI ligero). El README completo se construye en la Fase 8.
+> Estado: Fase 6 (monitoreo de drift). El README completo se construye en la Fase 8.
 
 ## Requisitos
 
@@ -270,3 +270,29 @@ make model-info                                           # versión, umbrales, 
 `tests/test_registry_real.py` automatiza esa verificación cuando existen los datos.
 
 **CI** (`.github/workflows/ci.yml`) corre `make lint`, `make test` y `make smoke`. `make smoke` ejecuta el pipeline completo con datos sintéticos (`noshow_guard.synthetic`) en un directorio temporal: datos, features, split, entrenamiento, guardado, simulación y registro. No depende del CSV de Kaggle ni toca `models/` ni `reports/`. Los tests que necesitan los datos reales se omiten en CI.
+
+## Monitoreo de drift (Fase 6)
+
+```bash
+make monitor   # python -m noshow_guard.drift report -> reports/drift_report.md
+```
+
+La implementación es propia, con numpy y scipy, en `drift.py`. Compara cada lote contra **train** en todas las features y en la probabilidad predicha:
+- **PSI** por variable. Las numéricas usan bins por cuantiles de la referencia, y un valor muy repetido (como el 0 en los conteos de historial) tiene su propio bin.
+- **KS** para numéricas y **chi²** para categóricas.
+- **Veredicto**, basado solo en el PSI: «reentrenar» si hay alerta (PSI > 0,25) en `lead_time_days`, `age`, `has_history` o la probabilidad; «vigilar» si alguna variable pasa de 0,10; «estable» en otro caso. Con menos de 100 filas no se evalúa. Los p-valores se muestran pero no deciden, porque con miles de filas casi todo resulta significativo.
+
+| Lote | Filas | Veredicto | Variables en alerta |
+|---|---|---|---|
+| Simulaciones registradas | 2 | muestra insuficiente | - |
+| Control sin drift (remuestreo de train) | 5.000 | **estable** | - |
+| Drift inducido (antelación triplicada, edad a la mitad, todos nuevos) | 5.000 | **reentrenar** | `lead_time_days` (2,76), `age` (2,90), `has_history` (0,95), `prev_appointments` (0,87), probabilidad (1,51) |
+| Test real (junio 2016) | 17.344 | **reentrenar** | `has_history` (0,44), `prev_appointments` (0,46) |
+
+![PSI por variable y lote](reports/figures/drift_psi.png)
+
+El drift inducido se detecta y el control sale estable, que es lo que pedía el criterio.
+
+El test real también da «reentrenar», y lo explica la ventana recortada del dataset, no un cambio de comportamiento: las citas de junio tienen más historial disponible que las de mayo. La probabilidad predicha casi no cambia (PSI 0,009).
+
+Las señales, el procedimiento de reentrenamiento y la validación campeón/retador antes de reemplazar el modelo están en [docs/retraining_plan.md](docs/retraining_plan.md).
