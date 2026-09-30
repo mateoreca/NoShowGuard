@@ -10,7 +10,19 @@ Simulador local de agendamiento de citas médicas con ML. Recibe un paciente, un
 
 > **La probabilidad es ilustrativa.** El modelo se entrenó con citas públicas de Brasil (2016), no con datos de una clínica real. La hora de la cita se registra, pero no influye en la predicción. Los resultados de impacto son **simulaciones** con supuestos explícitos.
 
-## Demo
+## App visual
+
+```bash
+make app   # abre http://localhost:8501
+```
+
+- **Paciente del dataset.** Eliges un paciente real (al azar o pegando su `PatientId`), ves su perfil y el historial que el modelo puede usar en la fecha de agendamiento, y programas una cita.
+- **Mis datos.** Llenas un formulario con tu edad, género, barrio y condiciones, como paciente nuevo.
+- **Resultado.** Muestra la probabilidad, el nivel de riesgo, la acción recomendada, el mensaje que se habría enviado, los 3 factores principales y la curva "¿y si...?".
+
+**No se guarda ni se envía nada.** La app usa un simulador sin registro ni sender (`evaluate()`), y hay un test que lo verifica. Además, solo escucha en `localhost` y la telemetría de Streamlit está apagada (`.streamlit/config.toml`). No tiene autenticación, así que no debe exponerse en una red.
+
+## Demo por línea de comandos
 
 ```bash
 uv run python -m noshow_guard.cli simulate --age 20 --gender M --neighbourhood "itararé" --scholarship \
@@ -92,8 +104,9 @@ make features   # features sin fuga + split cronológico
 make train      # modelos, calibración, umbrales, SHAP -> models/, reports/
 make monitor    # reporte de drift
 make impact     # simulación de impacto
-make test lint  # 157 tests; ruff + mypy
+make test lint  # 168 tests; ruff + mypy
 make smoke      # pipeline completo con datos sintéticos (lo que corre en CI)
+make app        # app visual local en http://localhost:8501
 ```
 
 ## Resultados
@@ -144,9 +157,9 @@ Otros documentos: [model card](docs/model_card.md), [calidad de datos](docs/data
 
 ```
 src/noshow_guard/   data, features, model, train, evaluation, explain, plots,
-                    schemas, simulator, cli, registry, actions (+ templates/), drift,
+                    schemas, simulator, cli, app + ui (Streamlit), registry, actions (+ templates/), drift,
                     impact, synthetic, smoke, formatting, config
-tests/              157 tests: anti-fuga, paridad, registro, drift, acciones, impacto
+tests/              168 tests: anti-fuga, paridad, registro, drift, acciones, impacto, app
 docs/               model_card, data_quality, retraining_plan, adr/0001-0005
 reports/            metrics.json, drift_report.md, impact.md, figures/
 notebooks/          01_eda.ipynb
