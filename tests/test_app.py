@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time as time_module
 from datetime import date, time
 from pathlib import Path
 
@@ -30,6 +31,23 @@ def test_sample_patients_exist_at_as_of(world: SyntheticWorld) -> None:
     assert (first_seen <= pd.Timestamp(AS_OF)).all()
     with_history = records.loc[records["appointment_date"] < pd.Timestamp(AS_OF), "patient_id"]
     assert with_history.nunique() == 20  # la mitad tiene citas previas terminadas
+
+
+def test_sample_patients_is_fast_with_many_text_ids() -> None:
+    """Regresión: con ~60k IDs de texto, la versión con np.setdiff1d tardaba ~60 s."""
+    n = 60_000
+    day = pd.Timestamp("2016-05-01")
+    records = pd.DataFrame(
+        {
+            "patient_id": [str(10_000_000 + i) for i in range(n)],
+            "scheduled_date": [day - pd.Timedelta(days=i % 30) for i in range(n)],
+            "appointment_date": [day + pd.Timedelta(days=(i % 7) - 3) for i in range(n)],
+        }
+    )
+    start = time_module.perf_counter()
+    ids = ui.sample_patients(records, day.date(), n=300)
+    assert time_module.perf_counter() - start < 3.0
+    assert len(ids) == 300
 
 
 def test_patient_history_only_before_as_of(world: SyntheticWorld) -> None:

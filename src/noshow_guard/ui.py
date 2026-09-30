@@ -56,9 +56,10 @@ def percent(p: float) -> str:
 def sample_patients(records: pd.DataFrame, as_of: date, n: int = 300, seed: int = 42) -> list[str]:
     """Pacientes que ya existen en ``as_of``; la mitad con citas previas terminadas."""
     day = pd.Timestamp(as_of)
-    known = records.loc[records["scheduled_date"] <= day, "patient_id"].unique()
-    with_history = records.loc[records["appointment_date"] < day, "patient_id"].unique()
-    others = np.setdiff1d(known, with_history)
+    known = pd.Index(records.loc[records["scheduled_date"] <= day, "patient_id"].unique())
+    with_history = pd.Index(records.loc[records["appointment_date"] < day, "patient_id"].unique())
+    # Index.difference usa hashing; np.setdiff1d sobre IDs de texto tardaba ~60 s con 58k IDs.
+    others = known.difference(with_history, sort=False)
     rng = np.random.default_rng(seed)
     half = n // 2
     picks = [
